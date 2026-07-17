@@ -23,3 +23,10 @@
   - **Bugs DuckDB résolus** : (1) `stopwords has been deleted` — le FTS ne supporte pas drop+create dans la même session (skill `reindex` utilise 2 connexions) ; (2) `CHECKPOINT` échoue si `vss` n'est pas chargé (`HNSW` non-bindé) → `kb.connect()` charge désormais toujours `vss` ; (3) `hnsw_enable_experimental_persistence` requis pour persister l'index HNSW sur disque.
   - **Nettoyage** : 3 backups `.duckdb` obsolètes supprimés (16 Mo), `.gitignore` étendu (`.agents/`, `.zcode/`).
   - 32/32 tests pytest verts.
+* **2026-07-18 — Suppression du dossier `raw/`** :
+  - L'ingestion se fait désormais depuis **n'importe quel chemin fourni par l'utilisateur** (fichier ou dossier local/réseau/UNC), plus de convention de dossier `raw/` imposée.
+  - Dossier `raw/` physique supprimé ; doc de test `raw/test.txt` retiré de la base (DELETE, 236 docs restants).
+  - `.gitignore` : section `raw/` remplacée par un commentaire générique (l'utilisateur ajoute ses chemins si besoin).
+  - `AGENTS.md` §1 reformulé : règle d'or générique sur les fichiers sources (peu importe le chemin, on ne modifie jamais, on indexe via le skill en lecture seule).
+  - `README.md`, `batch_ingest.py` : exemples mis à jour avec des chemins Windows (`C:\chemin\...`) au lieu de `raw/`.
+  - Document de conception obsolète `duckdb-kb-agent-plan.md` supprimé (décrivait l'ancienne architecture avec `raw/`).

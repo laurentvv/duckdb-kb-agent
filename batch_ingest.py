@@ -2,8 +2,8 @@
 
 Usage :
   uv run batch_ingest.py "C:\\chemin\\vers\\dossier"
-  uv run batch_ingest.py "./raw/docs" --category "Tech"
-  uv run batch_ingest.py "./raw/docs" --extensions .pdf .docx
+  uv run batch_ingest.py "C:\\chemin\\vers\\dossier" --category "Tech"
+  uv run batch_ingest.py "C:\\chemin\\vers\\dossier" --extensions .pdf .docx
 """
 
 import argparse

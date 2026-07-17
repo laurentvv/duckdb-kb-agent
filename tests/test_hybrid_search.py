@@ -45,7 +45,7 @@ def tmpdb(tmp_path):
     ]
     for did, txt, emb, name in docs:
         con.execute("INSERT INTO documents (id, file_name, file_path) VALUES (?, ?, ?)",
-                    [did, name, f"/raw/{name}"])
+                    [did, name, f"/data/{name}"])
         con.execute("INSERT INTO document_content (document_id, raw_text, embedding) VALUES (?, ?, ?)",
                     [did, txt, emb])
         con.execute("INSERT INTO document_ai_metadata (document_id, summary, keywords) VALUES (?, ?, ?)",

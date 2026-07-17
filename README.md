@@ -28,7 +28,7 @@
 - **[Ollama](https://ollama.com/)** démarré en local, avec :
   - un modèle de génération (chat web + analyse à l'ingestion) — configurable via `OLLAMA_BASE_URL` et `OLLAMA_MODEL` ;
   - le modèle d'**embedding** `bge-m3` (`ollama pull bge-m3`) pour la recherche vectorielle (configurable via `KB_EMBED_MODEL`).
-- Les documents sources sont placés dans `raw/` (non versionné).
+- Les documents sources : l'utilisateur fournit leur chemin à l'ingestion (fichier ou dossier local/réseau). Aucun dossier `raw/` imposé ; les documents ne sont pas versionnés (voir `.gitignore`).
 
 ## 🚀 Démarrage
 
@@ -40,7 +40,7 @@ uv sync
 uv run skills/init-db/run.py
 
 # 3. Ingestion d'un document (embedding calculé automatiquement)
-uv run skills/ingest-doc/run.py "raw/mon-document.pdf" --category "Tech"
+uv run skills/ingest-doc/run.py "C:\chemin\vers\document.pdf" --category "Tech"
 
 # 4. Recherche hybride (FTS + vectoriel, fusion RRF) — par défaut
 uv run skills/search-db/run.py "mots clés" --limit 3
@@ -50,9 +50,9 @@ uv run skills/search-db/run.py "mots clés" --limit 3
 ### Ingestion en masse
 
 ```bash
-uv run batch_ingest.py "./raw/dossier" --category "Exploitation"
+uv run batch_ingest.py "C:\chemin\vers\dossier" --category "Exploitation"
 # Filtrer par extensions :
-uv run batch_ingest.py "./raw/dossier" --extensions .pdf .docx
+uv run batch_ingest.py "C:\chemin\vers\dossier" --extensions .pdf .docx
 ```
 
 ### Interface web (chat)
@@ -95,8 +95,7 @@ duckdb-kb-agent/
 ├── pyproject.toml          # Dépendances (uv)
 ├── knowledge.duckdb        # Base DuckDB (générée, non versionnée)
 ├── log.md                  # Journal d'activité
-├── batch_ingest.py         # Ingestion en masse
-├── raw/                    # Documents sources (immuable, non versionné)
+├── batch_ingest.py         # Ingestion en masse (depuis un chemin fourni)
 ├── skills/                 # Outils de l'agent
 │   ├── init-db/            # Création de la base + index FTS + index vectoriel HNSW
 │   ├── ingest-doc/         # Extraction + insertion + embedding (Ollama)
