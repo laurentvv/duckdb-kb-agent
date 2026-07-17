@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environnement virtuel
+.venv/
+
+# Base de données binaire (générée, non versionnée)
+knowledge.duckdb
+knowledge.duckdb.wal
+knowledge.backup-*.duckdb
+
+# Documents sources (confidentiels) — on préserve uniquement le dossier
+raw/*
+!raw/.gitkeep
+
+# Config agent locale (spécifique à l'environnement de dev)
+.agents/
+.zcode/
+
+# Divers
+.DS_Store

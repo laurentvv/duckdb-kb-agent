@@ -1,0 +1,20 @@
+{"id": 1, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "URL exacte pour les deux."}
+{"id": 2, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 1, "H": 2}, "note": "Gemma complet (Mount, calendrier, Restore, Overwrite/Keep/Download). LFM omet l'étape Mount/calendrier."}
+{"id": 3, "gemma": {"F": 2, "P": 2, "C": 1, "H": 2}, "lfm": {"F": 1, "P": 2, "C": 2, "H": 1}, "note": "Gemma: AgentRM OK mais n'explique pas vraiment ECONNREFUSED. LFM: explique bien MAIS répond en anglais (contexte FR) + IPs approximatives."}
+{"id": 4, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 1}, "note": "VUP_WCF + raison (WSDL au démarrage) pour les deux. LFM ajoute des IPs non vérifiables."}
+{"id": 5, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 1, "H": 2}, "note": "Gemma: MDaemon + Microsoft + nomenclature. LFM omet la nomenclature Kalidea-."}
+{"id": 6, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 0, "C": 0, "H": 2}, "note": "Gemma: 'Kalidea -' correct. LFM: ECHEC - affirme que le contexte n'indique aucun préfixe alors qu'il y est."}
+{"id": 7, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "Procédure exacte (? > À propos > Code annuel) pour les deux."}
+{"id": 8, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 1, "C": 1, "H": 2}, "note": "Gemma: clair 'toujours total, jamais partial'. LFM dilue (relance total PUIS relance partial), message ambigu."}
+{"id": 9, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "Win 2008 R2 + 3 partitions (60/40/40) pour les deux."}
+{"id": 10, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 1, "C": 1, "H": 2}, "note": "Gemma: commande complète avec -subj, RSA 2048. LFM: omet -subj et confond sha256 (digest) avec l'algo de clé."}
+{"id": 11, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "Réutiliser CSR/clé des années précédentes pour les deux."}
+{"id": 12, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 1, "C": 2, "H": 2}, "note": "Gemma complet. LFM: erreur étape 4 (delete-secret-keys au lieu de delete-keys pour la clé publique)."}
+{"id": 13, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 1}, "note": "Gemma honnête (dit que le contexte ne donne pas la raison). LFM INVENTE une raison ('limiter privilèges') = hallucination."}
+{"id": 14, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "data_source + requête Association_connection exacte pour les deux."}
+{"id": 15, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 1, "C": 2, "H": 1}, "note": "Gemma: contexte + requête fidèles. LFM: répond en ANGLAIS (contexte/question FR) + 'GFCERTIFICATE' au lieu de CTB_GIFTCERTIFICATE."}
+{"id": 16, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 1, "H": 2}, "note": "Gemma: complet (plusieurs étapes du doc). LFM: juste le paramètre principal, minimaliste."}
+{"id": 17, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 1, "C": 2, "H": 2}, "note": "Gemma: libellés exacts. LFM: 'Paramètres & Synchronisation' au lieu de 'Comptes &' et 'Échange' au lieu de 'Exchange'."}
+{"id": 18, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 2, "H": 2}, "note": "Netdom query fsmo pour les deux."}
+{"id": 19, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 1, "H": 2}, "note": "Gemma: complet (adduser, passwd, mkdir, chown, nologin). LFM: minimaliste, omet passwd/mkdir/chown/nologin."}
+{"id": 20, "gemma": {"F": 2, "P": 2, "C": 2, "H": 2}, "lfm": {"F": 2, "P": 2, "C": 1, "H": 2}, "note": "Gemma: procédure complète + 'ne rien modifier d'autre'. LFM: correct mais minimaliste, phrase mal formée."}
