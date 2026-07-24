@@ -20,6 +20,18 @@ DB_PATH = "knowledge.duckdb"
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 EMBED_MODEL = os.getenv("KB_EMBED_MODEL", "bge-m3:latest")
 EMBED_DIM = 1024
+
+# --- Vision LLM (OCR/description des images : PDF scannés, images DOCX, .png) ---
+# Opt-in (défaut off) car un appel VLM = ~15-30s/image. Active avec
+# KB_VISION_ENABLED=1 ou --vision (CLI ingest-doc). Réutilise le MÊME modèle que
+# le chat (Gemma 4 E4B est multimodal) -> aucun modèle supplémentaire à puller.
+# Format OpenAI-compatible (suffixe /v1) pour le client openai.OpenAI.
+LLM_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/") + "/v1"
+VISION_MODEL = os.getenv("KB_VISION_MODEL",
+                         "hf.co/unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL")
+VISION_ENABLED = os.getenv("KB_VISION_ENABLED", "").lower() in ("1", "true", "yes")
+VISION_TIMEOUT = int(os.getenv("KB_VISION_TIMEOUT", "300"))  # s (vs 60 dur dans pdf-ocr-ai)
+VISION_DPI = int(os.getenv("KB_VISION_DPI", "200"))          # rasterisation pages (compromis perf)
 MAX_TEXT_CHARS = 8000  # bge-m3 limite ~8192 tokens ; troncature par défaut.
                        # En cas d'erreur de contexte (français technique gourmand
                        # en tokens), kb.embed réduit progressivement la taille.

@@ -12,6 +12,7 @@ dependencies = [
     "mammoth>=1.8.0",
     "openai>=2.45.0",
     "pandas>=3.0.3",
+    "pdf-ocr-ai @ git+https://github.com/laurentvv/pdf-ocr-ai.git",
     "pdfplumber>=0.11.0",
     "pydantic>=2.13.4",
     "pymupdf>=1.28.0",

@@ -50,24 +50,57 @@ class Chunk:
 _TITLE_TYPES = {"Title", "Section"}
 
 
-def extract_elements(file_path: str) -> list[Element]:
+def extract_elements(file_path: str, vision_enabled: bool = False) -> list[Element]:
     """Extrait les éléments structurés d'un fichier.
 
     Routeur par extension. Renvoie une liste d'``Element`` ordonnée comme le
     document. Lève ``ValueError`` si l'extraction échoue définitivement.
+
+    ``vision_enabled`` : si True, les images (PDF scannés, images DOCX,
+    fichiers .png/.jpg isolés) sont envoyées au VLM (vision.describe_image)
+    et leur description est ajoutée comme Element. Opt-in (coût ~15-30s/image).
     """
     ext = os.path.splitext(file_path)[1].lower()
     if ext == ".pdf":
-        return _extract_pdf(file_path)
+        return _extract_pdf(file_path, vision_enabled)
     if ext == ".docx":
-        return _extract_docx(file_path)
+        return _extract_docx(file_path, vision_enabled)
     if ext in (".html", ".htm"):
         return _extract_html(file_path)
     if ext == ".csv":
         return _extract_csv(file_path)
     if ext == ".xlsx":
         return _extract_xlsx(file_path)
+    if ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff"):
+        return _extract_image_file(file_path, vision_enabled)
     return _extract_text_file(file_path)
+
+
+def _extract_image_file(file_path: str, vision_enabled: bool = False) -> list[Element]:
+    """Fichier image isolé (.png/.jpg/...) : description via VLM si activée.
+
+    Sans vision, retourne [] (l'image n'est pas indexable textuellement).
+    Avec vision, renvoie un Element contenant la description Markdown du VLM.
+    """
+    if not vision_enabled:
+        return []
+    import vision  # type: ignore  # noqa: PLC0415
+    try:
+        with open(file_path, "rb") as f:
+            image_bytes = f.read()
+        # MIME depuis l'extension.
+        ext = os.path.splitext(file_path)[1].lower().lstrip(".")
+        mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                    "gif": "image/gif", "bmp": "image/bmp", "tif": "image/tiff",
+                    "tiff": "image/tiff"}
+        mime = mime_map.get(ext, "image/png")
+        desc = vision.describe_image(image_bytes, mime=mime)
+        if desc:
+            return [Element(text=desc, element_type="NarrativeText",
+                            section=os.path.basename(file_path))]
+    except Exception as e:
+        print(f"  [vision] ECHEC image {os.path.basename(file_path)}: {e}")
+    return []
 
 
 def _current_section(elements: list[Element]) -> str | None:
@@ -78,12 +111,16 @@ def _current_section(elements: list[Element]) -> str | None:
     return None
 
 
-def _extract_pdf(file_path: str) -> list[Element]:
-    """PDF via pdfplumber (texte + tables + page), repli PyMuPDF si besoin."""
+def _extract_pdf(file_path: str, vision_enabled: bool = False) -> list[Element]:
+    """PDF via pdfplumber (texte + tables + page), repli PyMuPDF si besoin.
+
+    ``vision_enabled`` : les pages sans texte ni table (PDF scannés / images)
+    sont rasterisées et envoyées au VLM pour transcription/description.
+    """
     try:
         import pdfplumber  # type: ignore
     except ImportError:
-        return _extract_pdf_fitz(file_path)
+        return _extract_pdf_fitz(file_path, vision_enabled)
 
     elements: list[Element] = []
     try:
@@ -114,7 +151,17 @@ def _extract_pdf(file_path: str) -> list[Element]:
                     extra_attrs=["size", "fontname"],
                 )
                 if not words and not table_bboxes:
-                    # Page sans texte extractible (PDF image potentiel) : on note rien.
+                    # Page sans texte ni table (PDF scanné / image) : si la vision
+                    # est activée, on rasterise la page et on l'envoie au VLM pour
+                    # transcription. Sinon, on ignore (comportement historique).
+                    if vision_enabled:
+                        desc = _describe_pdf_page(file_path, page_no, elements)
+                        if desc:
+                            elements.append(Element(
+                                text=desc, element_type="NarrativeText",
+                                page_number=page_no,
+                                section=_current_section(elements),
+                            ))
                     continue
                 # Reconstruire des lignes par regroupement vertical (top).
                 lines = _group_words_into_lines(words, exclude_bboxes=table_bboxes)
@@ -195,8 +242,12 @@ def _group_words_into_lines(
     return result
 
 
-def _extract_pdf_fitz(file_path: str) -> list[Element]:
-    """Repli PyMuPDF (texte natif uniquement, pas de tables)."""
+def _extract_pdf_fitz(file_path: str, vision_enabled: bool = False) -> list[Element]:
+    """Repli PyMuPDF (texte natif uniquement, pas de tables).
+
+    ``vision_enabled`` : les pages sans texte extractible sont rasterisées et
+    envoyées au VLM.
+    """
     import fitz  # type: ignore  # noqa: PLC0415
 
     elements: list[Element] = []
@@ -204,6 +255,16 @@ def _extract_pdf_fitz(file_path: str) -> list[Element]:
     try:
         for page_no, page in enumerate(doc, start=1):
             text = page.get_text() or ""
+            if not text.strip() and vision_enabled:
+                # Page image (PDF scanné) -> VLM.
+                desc = _describe_pdf_page(file_path, page_no, elements)
+                if desc:
+                    elements.append(Element(
+                        text=desc, element_type="NarrativeText",
+                        page_number=page_no,
+                        section=_current_section(elements),
+                    ))
+                continue
             for raw_line in text.splitlines():
                 line = raw_line.strip()
                 if not line:
@@ -218,7 +279,22 @@ def _extract_pdf_fitz(file_path: str) -> list[Element]:
     return elements
 
 
-def _extract_docx(file_path: str) -> list[Element]:
+def _describe_pdf_page(file_path: str, page_no: int,
+                       elements: list[Element]) -> str | None:
+    """Rasterise une page PDF et l'envoie au VLM. Renvoie la description ou None.
+
+    Helper mutualisé entre _extract_pdf (pdfplumber) et _extract_pdf_fitz.
+    """
+    import vision  # type: ignore  # noqa: PLC0415
+    try:
+        img_bytes = vision.rasterize_page_to_png(file_path, page_no)
+        return vision.describe_image(img_bytes)
+    except Exception as e:
+        print(f"  [vision] ECHEC page {page_no} de {os.path.basename(file_path)}: {e}")
+        return None
+
+
+def _extract_docx(file_path: str, vision_enabled: bool = False) -> list[Element]:
     """DOCX : python-docx en principal, mammoth en repli.
 
     python-docx est préféré car il préserve fidèlement TOUT le contenu des
@@ -227,9 +303,12 @@ def _extract_docx(file_path: str) -> list[Element]:
     (HTML) perdait une partie du contenu sur certains DOCX (texte dans des
     spans imbriqués non récupérés par le parcours BeautifulSoup), d'où le
     repli uniquement si python-docx échoue ou renvoie un contenu vide.
+
+    ``vision_enabled`` : les images embarquées (inline_shapes) sont décrites
+    par le VLM (uniquement via le backend python-docx).
     """
     try:
-        elements = _extract_docx_python_docx(file_path)
+        elements = _extract_docx_python_docx(file_path, vision_enabled)
         # Garde-fou : si python-docx renvoie un contenu manifestement incomplet,
         # on tente mammoth (qui peut mieux gérer certains formats exotiques).
         text_len = sum(len(e.text) for e in elements)
@@ -308,8 +387,12 @@ def _table_to_text(table_node) -> str:
     return "\n".join(rows).strip()
 
 
-def _extract_docx_python_docx(file_path: str) -> list[Element]:
-    """Repli python-docx : paragraphes (avec style Heading) + tables inline."""
+def _extract_docx_python_docx(file_path: str, vision_enabled: bool = False) -> list[Element]:
+    """Repli python-docx : paragraphes (avec style Heading) + tables inline.
+
+    ``vision_enabled`` : les images embarquées (``doc.inline_shapes``) sont
+    décrites par le VLM et ajoutées comme Elements (en fin de document).
+    """
     import docx  # type: ignore  # noqa: PLC0415
 
     doc = docx.Document(file_path)
@@ -361,6 +444,24 @@ def _extract_docx_python_docx(file_path: str) -> list[Element]:
                     text=text, element_type="Table",
                     section=_current_section(elements),
                 ))
+    # Images embarquées (inline_shapes) : description via VLM si activée.
+    # Ajoutées en fin de document (l'ordre exact dans le flux serait complexe à
+    # reconstruire ; pour le retrieval, la section courante suffit à les situer).
+    if vision_enabled:
+        import vision  # type: ignore  # noqa: PLC0415
+        for shape in getattr(doc, "inline_shapes", []) or []:
+            try:
+                blob = shape.image.blob
+                mime = getattr(shape.image, "content_type", None) or "image/png"
+                desc = vision.describe_image(blob.read(), mime=mime)
+                if desc:
+                    elements.append(Element(
+                        text=desc, element_type="NarrativeText",
+                        section=_current_section(elements),
+                    ))
+            except Exception as e:
+                print(f"  [vision] ECHEC image DOCX ({os.path.basename(file_path)}): {e}")
+                continue
     return elements
 
 

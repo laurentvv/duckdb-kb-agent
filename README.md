@@ -30,6 +30,7 @@
 - **[Ollama](https://ollama.com/)** démarré en local, avec :
   - un modèle de génération (chat web + analyse à l'ingestion) — configurable via `OLLAMA_BASE_URL` et `OLLAMA_MODEL` ;
   - le modèle d'**embedding** `bge-m3` (`ollama pull bge-m3`) pour la recherche vectorielle (configurable via `KB_EMBED_MODEL`).
+  - pour la **vision** (images/PDF scannés, *optionnel*) : un modèle multimodal. Par défaut le même Gemma 4 (qui est multimodal) — aucun modèle supplémentaire à installer.
 - Les documents sources : l'utilisateur fournit leur chemin à l'ingestion (fichier ou dossier local/réseau). Aucun dossier `raw/` imposé ; les documents ne sont pas versionnés (voir `.gitignore`).
 
 ## 🚀 Démarrage
@@ -65,6 +66,28 @@ Le dédoublonnage est **intelligent** : un document non modifié (même contenu)
 ```bash
 uv run uvicorn web.app:app --reload
 ```
+
+### Vision LLM (images & PDF scannés) — optionnel
+
+Par défaut, les images (PDF scannés, images embarquées dans les DOCX, fichiers `.png`/`.jpg` isolés) sont **ignorées** : seul le texte est indexé. L'option **vision** les envoie à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui génère une transcription/description indexée comme un chunk normal.
+
+```bash
+# Activer la vision pour un document (--vision)
+uv run skills/ingest-doc/run.py "C:\chemin\capture.png" --vision
+uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf" --vision
+
+# Ou activer globalement via une variable d'environnement
+set KB_VISION_ENABLED=1
+uv run batch_ingest.py "C:\chemin\dossier"
+```
+
+⚠️ **Coût** : chaque image = ~15-30s d'appel au VLM. La vision est donc **opt-in** (désactivée par défaut) pour ne pas exploser le temps d'ingestion. Si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas).
+
+Configuration (variables d'environnement) :
+- `KB_VISION_ENABLED=1` — active la vision globalement
+- `KB_VISION_MODEL` — modèle multimodal (défaut : le même Gemma 4 que le chat)
+- `KB_VISION_DPI` — résolution de rasterisation des pages PDF (défaut : 200)
+- `KB_VISION_TIMEOUT` — timeout par image en secondes (défaut : 300)
 
 ## 🔧 Maintenance
 
