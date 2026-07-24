@@ -1,0 +1,30 @@
+[project]
+name = "duckdb-kb-agent"
+version = "0.1.0"
+description = "Base documentaire agentique propulsée par DuckDB (FTS/BM25) et un agent IA."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "duckdb>=1.5.4",
+    "fastapi>=0.139.0",
+    "openai>=2.45.0",
+    "pandas>=3.0.3",
+    "pydantic>=2.13.4",
+    "pymupdf>=1.28.0",
+    "python-docx>=1.2.0",
+    "rich>=15.0.0",
+    "uvicorn>=0.51.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+markers = [
+    "integration: tests nécessitant knowledge.duckdb indexé et/ou Ollama (skippés par défaut)",
+]

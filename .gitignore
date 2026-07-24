@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environnement virtuel
+.venv/
+
+# Base de données binaire (générée, non versionnée)
+knowledge.duckdb
+knowledge.duckdb.wal
+knowledge.backup-*.duckdb
+
+# Documents sources (l'utilisateur fournit le chemin à l'ingestion, aucune
+# convention de dossier imposée — ne pas committer les documents métier).
+# Ajoutez ici vos chemins si besoin, ex :
+# /data/
+# /docs/
+
+# Config agent locale (spécifique à l'environnement de dev)
+.agents/
+.zcode/
+
+# Divers
+.DS_Store

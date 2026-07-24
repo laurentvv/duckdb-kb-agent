@@ -1,0 +1,20 @@
+{"id": 1, "question": "Quelle est l'adresse web pour accéder à l'outil de restauration Veeam Backup des dossiers et fichiers ?", "theme": "Sauvegarde", "expected_doc_hint": "Veeam Backup UP de dossiers"}
+{"id": 2, "question": "Comment restaure-t-on un dossier via Veeam Backup une fois le serveur sélectionné ?", "theme": "Sauvegarde", "expected_doc_hint": "Veeam Backup UP de dossiers"}
+{"id": 3, "question": "Que signifie l'erreur « connect ECONNREFUSED 127.0.0.1:4004 » sur l'API GraphQL VUP et quel compte utiliser pour intervenir ?", "theme": "Dépannage", "expected_doc_hint": "GRAPHQL - Erreur_pm2"}
+{"id": 4, "question": "Quel pool d'applications IIS doit-on recycler lors d'un problème avec l'API VUP, et pourquoi ?", "theme": "Dépannage", "expected_doc_hint": "GRAPHQL - Erreur_pm2"}
+{"id": 5, "question": "Quelle est la procédure pour créer une boîte aux lettres partagée pour une adresse en up-cse.fr ?", "theme": "Messagerie", "expected_doc_hint": "création-boite-aux-lettres-partagée"}
+{"id": 6, "question": "Quel préfixe faut-il obligatoirement ajouter devant le nom d'une boîte aux lettres partagée ?", "theme": "Messagerie", "expected_doc_hint": "création-boite-aux-lettres-partagée"}
+{"id": 7, "question": "Comment ajouter un code d'activation sur Sage 100 si la fenêtre de licence expirée ne s'affiche pas au démarrage ?", "theme": "Sage", "expected_doc_hint": "Procédure code d'activation Sage"}
+{"id": 8, "question": "Faut-il relancer une indexation partielle ou totale après un plantage de l'indexation ENDECA ?", "theme": "Dépannage", "expected_doc_hint": "ENDECA - Erreur JAVA_Indexation"}
+{"id": 9, "question": "Quels sont les pré-requis système (OS et partitions) pour installer le moteur de recherche ENDECA ?", "theme": "Infrastructure", "expected_doc_hint": "ENDECA - Installation"}
+{"id": 10, "question": "Quelle commande openssl permet de générer un CSR et une clé privée pour un certificat SSL, et avec quel algorithme ?", "theme": "Sécurité", "expected_doc_hint": "SSL - Changement de certificat"}
+{"id": 11, "question": "Que peut-on faire si la clé privée d'un certificat SSL est arrivée à expiration mais que le certificat a été pris sur plusieurs années ?", "theme": "Sécurité", "expected_doc_hint": "SSL - Changement de certificat"}
+{"id": 12, "question": "Comment supprimer les anciennes clés GPG associées à CARREFOUR avant d'en créer une nouvelle ?", "theme": "Sécurité", "expected_doc_hint": "GPG - Carrefour"}
+{"id": 13, "question": "Pourquoi le SSH root est-il désactivé sur le serveur WEB247 et comment s'y connecte-t-on ?", "theme": "Sécurité", "expected_doc_hint": "GPG - Carrefour"}
+{"id": 14, "question": "Comment trouve-t-on l'emplacement (serveur SQL) de la base de données d'un client et quelle requête permet de l'identifier ?", "theme": "SQL", "expected_doc_hint": "Client résilié V2 - Suppression"}
+{"id": 15, "question": "Quel est le contexte métier et la requête SQL de test associés à l'erreur ORACLE « Attribution Code is CRITICAL » ?", "theme": "SQL", "expected_doc_hint": "ORACLE - SQL Attribution de codes"}
+{"id": 16, "question": "Quel paramètre doit-on modifier dans Microsoft Edge pour utiliser UpGestion+ en mode Internet Explorer ?", "theme": "Navigateur", "expected_doc_hint": "Continuite_Edge"}
+{"id": 17, "question": "Comment changer le mot de passe d'une messagerie Exchange existante sur un smartphone Xiaomi Redmi Note 10 ?", "theme": "Mobile", "expected_doc_hint": "Xiaomi Rednote 10 5G"}
+{"id": 18, "question": "Quelle commande permet de vérifier quel serveur détient les rôles FSMO dans Active Directory ?", "theme": "Active Directory", "expected_doc_hint": "Transfert des rôles FSMO"}
+{"id": 19, "question": "Comment crée-t-on un compte SFTP sur le serveur 46.20.172.247 et à quel groupe doit-il appartenir ?", "theme": "Infrastructure", "expected_doc_hint": "Creation_SFTP"}
+{"id": 20, "question": "Comment modifie-t-on la configuration VPN FortiClient (quelle passerelle distante) et que ne faut-il surtout pas changer ?", "theme": "Réseau", "expected_doc_hint": "Paramétrage VPN FortiClient"}
