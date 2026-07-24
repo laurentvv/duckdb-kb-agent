@@ -8,6 +8,10 @@ Applique les évolutions du schéma à une base existante :
   3. Ajoute la colonne embedding FLOAT[1024] + l'index HNSW (cosine) sur
      document_content (pour la recherche vectorielle). Ne calcule PAS les
      embeddings (trop lent) : utiliser skills/embed-docs pour le remplissage.
+  4. Crée la table ``chunks`` (granularité sous-document) + index FTS et HNSW
+     associés. Non destructive : n'ajoute aucune donnée, juste la structure.
+     Le remplissage des chunks se fait via skills/embed-docs --rechunk ou une
+     ré-ingestion.
 
 Sécurité :
   - --dry-run par défaut : n'écrit rien, affiche uniquement le plan.
@@ -141,6 +145,91 @@ def convert_keywords(con, dry):
     return True
 
 
+def add_chunks_table(con, dry):
+    """Crée la table ``chunks`` + index FTS et HNSW (non destructif, idempotent).
+
+    N'insère aucune donnée : seule la structure est créée. Le remplissage se
+    fait par ré-ingestion (skills/ingest-doc) ou par skills/embed-docs --rechunk.
+    """
+    # 1. Table chunks (si absente).
+    has_table = con.execute(
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema = 'main' AND table_name = 'chunks'"
+    ).fetchone()[0]
+    if has_table == 0:
+        if dry:
+            print("  [dry-run] création table chunks (id, document_id, chunk_index, "
+                  "text, element_type, page_number, section, embedding).")
+        else:
+            con.execute(
+                """
+                CREATE TABLE chunks (
+                    id VARCHAR PRIMARY KEY,
+                    document_id VARCHAR,
+                    chunk_index INTEGER,
+                    text TEXT,
+                    element_type VARCHAR,
+                    page_number INTEGER,
+                    section VARCHAR,
+                    embedding FLOAT[1024],
+                    FOREIGN KEY (document_id) REFERENCES documents(id)
+                );
+                """
+            )
+            print("  [ok] table chunks créée.")
+    else:
+        print("  [skip] table chunks déjà présente.")
+
+    # 2. Index FTS sur chunks.text.
+    has_fts = con.execute(
+        "SELECT COUNT(*) FROM duckdb_indexes() WHERE index_name = 'chunks_fts_index'"
+    ).fetchone()[0]
+    # Le nom de l'index FTS créé par PRAGMA est interne ; on tente et on ignore si existe.
+    if dry:
+        print("  [dry-run] création index FTS sur chunks.text.")
+    else:
+        try:
+            con.execute("LOAD fts;")
+        except Exception:
+            pass
+        try:
+            con.execute("PRAGMA create_fts_index('chunks', 'id', 'text');")
+            print("  [ok] index FTS chunks créé.")
+        except Exception as e:
+            print(f"  [skip] index FTS chunks (déjà présent ou échec) : {e}")
+
+    # 3. Index HNSW sur chunks.embedding.
+    try:
+        con.execute("LOAD vss;")
+    except Exception:
+        try:
+            con.execute("INSTALL vss; LOAD vss;")
+        except Exception as e:
+            print(f"  [BLOCKÉ] extension vss indisponible : {e}")
+            return False
+    try:
+        con.execute("SET hnsw_enable_experimental_persistence = true;")
+    except Exception:
+        pass
+    has_hnsw = con.execute(
+        "SELECT COUNT(*) FROM duckdb_indexes() WHERE index_name = 'idx_chunks_embedding'"
+    ).fetchone()[0]
+    if has_hnsw:
+        print("  [skip] index HNSW chunks déjà présent.")
+    elif dry:
+        print("  [dry-run] création index HNSW (cosine) sur chunks.embedding.")
+    else:
+        try:
+            con.execute(
+                "CREATE INDEX idx_chunks_embedding "
+                "ON chunks USING HNSW (embedding) WITH (metric = 'cosine');"
+            )
+            print("  [ok] index HNSW chunks créé.")
+        except Exception as e:
+            print(f"  [warn] index HNSW chunks non créé : {e}")
+    return True
+
+
 def add_embedding_column(con, dry):
     """Ajoute document_content.embedding FLOAT[1024] + index HNSW (cosine).
 
@@ -212,20 +301,22 @@ def main():
 
     con = duckdb.connect(str(db))
     try:
-        print("[1/3] Contraintes PRIMARY KEY :")
+        print("[1/4] Contraintes PRIMARY KEY :")
         ok1 = add_pk(con, "document_content", dry=not args.apply)
         ok2 = add_pk(con, "document_ai_metadata", dry=not args.apply)
-        print("\n[2/3] Conversion keywords JSON -> VARCHAR[] :")
+        print("\n[2/4] Conversion keywords JSON -> VARCHAR[] :")
         ok3 = convert_keywords(con, dry=not args.apply)
-        print("\n[3/3] Colonne embedding + index HNSW :")
+        print("\n[3/4] Colonne embedding + index HNSW :")
         ok4 = add_embedding_column(con, dry=not args.apply)
+        print("\n[4/4] Table chunks + index FTS/HNSW :")
+        ok5 = add_chunks_table(con, dry=not args.apply)
     finally:
         con.close()
 
     print("\n=== Migration terminée ===")
     if not args.apply:
         print("Dry-run : aucune donnée écrite. Relancer avec --apply pour exécuter.")
-    if not (ok1 and ok2 and ok3 and ok4):
+    if not (ok1 and ok2 and ok3 and ok4 and ok5):
         print("Des étapes ont été sautées ou bloquées (voir ci-dessus).")
         sys.exit(2)
 
