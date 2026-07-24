@@ -10,17 +10,19 @@
     </div>
 
     ## 💡 About
-    **DuckDB KB Agent** is a paradigm shift from traditional Markdown-based wikis. Instead of human-maintained documentation, this system is designed to be **operated entirely by an AI Coding Agent** (e.g.,
+**DuckDB KB Agent** is a paradigm shift from traditional Markdown-based wikis. Instead of human-maintained documentation, this system is designed to be **operated entirely by an AI Coding Agent** (e.g.,
   Antigravity, Cline).
 
-    The agent uses specialized Python skills to ingest raw documents (PDF, Word, Excel), extracts metadata and summaries using LLMs (Local or API), and stores everything in a **DuckDB database**. It answers
-  user queries instantly using DuckDB's native **Full-Text Search (FTS)**, completely bypassing the need for complex and costly Vector Databases (RAG).
+  The agent uses specialized Python skills to ingest raw documents (PDF, Word, Excel, HTML), extract **structured elements** (titles, paragraphs, tables) with metadata (page number, section, element type), chunk them semantically, and store everything in a **DuckDB database**. It answers user queries using a **hybrid retrieval** (BM25 Full-Text Search + vector embeddings via Reciprocal Rank Fusion) at the **chunk level**, with verifiable source citations.
 
 ### ✨ Key Features
-- **Zero Hallucination**: The Agent queries the SQL database and bases its answers purely on the raw FTS extracts.
-- **RAG Alternative**: No embeddings, no vector DBs. Uses BM25 Full-Text Search for ultra-fast, exact-match document retrieval.
-- **Agent-First Architecture**: Features a strict `AGENTS.md` manifesto instructing the AI on how to interact with the database using isolated Python scripts (`skills/`).
-- **Modern Stack**: Built with Python 3.14, `uv`, Pydantic (Structured Output), and PyMuPDF.
+- **Structured extraction**: PDF (pdfplumber, tables + page numbers), Word (python-docx, tables + headings), HTML (trafilatura), Office/Excel — all routed automatically.
+- **Semantic chunking**: documents are split into structure-aware chunks (titles as boundaries, tables preserved, ~600-1200 chars) so every passage is vectorized and retrievable.
+- **Hybrid retrieval (chunk-level)**: BM25 (exact match) + bge-m3 embeddings (semantic) fused via Reciprocal Rank Fusion, with per-document diversification.
+- **Verifiable citations**: each result carries page number, section and element type, so the agent can cite its sources.
+- **Zero Cloud**: 100% local (Ollama for embeddings + LLM, DuckDB for storage/search). No external API.
+- **Agent-First Architecture**: a strict `AGENTS.md` manifesto instructs the AI on how to interact with the database using isolated Python scripts (`skills/`).
+- **Modern Stack**: Python 3.14, `uv`, Pydantic, DuckDB (FTS + vss/HNSW).
 
 ## 🛠️ Prérequis
 
@@ -39,7 +41,8 @@ uv sync
 # 2. Initialiser la base DuckDB (tables + index FTS + index vectoriel HNSW)
 uv run skills/init-db/run.py
 
-# 3. Ingestion d'un document (embedding calculé automatiquement)
+# 3. Ingestion d'un document
+#    (extraction structurée + chunking + embedding doc + embeddings chunks + résumé LLM)
 uv run skills/ingest-doc/run.py "C:\chemin\vers\document.pdf" --category "Tech"
 
 # 4. Recherche hybride (FTS + vectoriel, fusion RRF) — par défaut
@@ -55,6 +58,8 @@ uv run batch_ingest.py "C:\chemin\vers\dossier" --category "Exploitation"
 uv run batch_ingest.py "C:\chemin\vers\dossier" --extensions .pdf .docx
 ```
 
+Le dédoublonnage est **intelligent** : un document non modifié (même contenu) est skippé, un document modifié (même chemin, contenu différent) est **mis à jour** (l'ancienne version et ses chunks sont purgés puis remplacés). `--force` force la ré-ingestion.
+
 ### Interface web (chat)
 
 ```bash
@@ -67,13 +72,14 @@ uv run uvicorn web.app:app --reload
   ```bash
   uv run skills/reindex/run.py
   ```
-- **(Re)calculer les embeddings** (recherche vectorielle) — reprise sécurisée :
+- **(Re)calculer les embeddings** (document et/ou chunks) — reprise sécurisée :
   ```bash
-  uv run skills/embed-docs/run.py                       # docs sans embedding
+  uv run skills/embed-docs/run.py                       # docs/chunks sans embedding
   uv run skills/embed-docs/run.py --rebuild             # recalculer tout
+  uv run skills/embed-docs/run.py --chunks-only         # embeddings de chunks uniquement
   uv run skills/embed-docs/run.py --filter "file_path ILIKE '%\\sage\\%'"   # sous-ensemble
   ```
-- **Migrer une base ancienne** vers le schéma courant (clés primaires, `keywords` en liste, colonne `embedding` + index HNSW) :
+- **Migrer une base ancienne** vers le schéma courant (clés primaires, `keywords` en liste, colonne `embedding` + index HNSW, **table `chunks`** + index FTS/HNSW) :
   ```bash
   uv run skills/migrate-db/run.py            # dry-run (lecture seule)
   uv run skills/migrate-db/run.py --apply    # exécute (sauvegarde automatique)
@@ -86,23 +92,36 @@ uv run pytest                      # tests unitaires (base temporaire, mock LLM/
 uv run pytest -m integration       # + tests d'intégration (nécessitent knowledge.duckdb)
 ```
 
+## 🧱 Schéma de la base
+
+```text
+documents              id (hash SHA-256 du contenu) PK, file_name, file_path, category, indexed_at
+document_content       document_id PK (1:1), raw_text (texte complet), embedding FLOAT[1024]
+document_ai_metadata   document_id PK (1:1), summary (LLM), keywords VARCHAR[]
+chunks                 id PK, document_id FK, chunk_index, text, element_type,
+                       page_number, section, embedding FLOAT[1024]
+```
+
+Index : FTS (BM25) sur `document_content.raw_text` et `chunks.text` ; HNSW (cosine) sur `document_content.embedding` et `chunks.embedding`.
+
 ## 📂 Architecture
 
 ```text
 duckdb-kb-agent/
 ├── AGENTS.md               # Directives de l'agent IA
-├── kb.py                   # Lib partagée (connexion DuckDB, embeddings, recherche hybride)
+├── kb.py                   # Lib partagée (connexion DuckDB, embeddings, recherche hybride, get_chunk_id)
+├── parsing.py              # Extraction structurée (PDF/DOCX/HTML/XLSX/txt) + chunking sémantique
 ├── pyproject.toml          # Dépendances (uv)
 ├── knowledge.duckdb        # Base DuckDB (générée, non versionnée)
-├── log.md                  # Journal d'activité
 ├── batch_ingest.py         # Ingestion en masse (depuis un chemin fourni)
 ├── skills/                 # Outils de l'agent
-│   ├── init-db/            # Création de la base + index FTS + index vectoriel HNSW
-│   ├── ingest-doc/         # Extraction + insertion + embedding (Ollama)
-│   ├── embed-docs/         # Remplissage massif des embeddings (bge-m3)
-│   ├── search-db/          # Recherche hybride (FTS + vectoriel, fusion RRF)
+│   ├── init-db/            # Création de la base + tables + index FTS + index vectoriel HNSW
+│   ├── ingest-doc/         # Extraction + chunking + insertion + embeddings (Ollama)
+│   ├── embed-docs/         # Remplissage massif des embeddings (doc + chunks)
+│   ├── search-db/          # Recherche hybride chunk-level (FTS + vectoriel, fusion RRF)
 │   ├── reindex/            # Reconstruction de l'index FTS
 │   └── migrate-db/         # Migration du schéma (non destructive)
+├── bench/                  # Benchmark RAG (questions, run, comparatif)
 ├── tests/                  # Suite pytest
 └── web/                    # Interface FastAPI (chat)
 ```

@@ -22,3 +22,8 @@ knowledge.backup-*.duckdb
 
 # Divers
 .DS_Store
+
+# Résultats de benchmark (régénérables, volumineux) — les scripts restent versionnés
+bench/results*.jsonl
+bench/results*.md
+bench/REPORT_chunks_final.md
