@@ -276,8 +276,11 @@ def _purge_document(doc_id: str) -> None:
     try:
         try:
             conn.execute("DELETE FROM chunks WHERE document_id = ?", (doc_id,))
-        except Exception:
-            pass  # table chunks absente (vieille base)
+        except duckdb.CatalogException:
+            # Table chunks absente (vieille base non migrée) : on ignore ce
+            # DELETE mais on laisse remonter toute autre erreur DB (connexion,
+            # contrainte, etc.) qui ne doit pas être masquée silencieusement.
+            pass
         conn.execute("DELETE FROM document_content WHERE document_id = ?", (doc_id,))
         conn.execute("DELETE FROM document_ai_metadata WHERE document_id = ?", (doc_id,))
         conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))

@@ -385,7 +385,10 @@ def _extract_html(file_path: str) -> list[Element]:
             for node in soup.descendants:
                 if not getattr(node, "name", None):
                     continue
-                if node.name in ("head", "hi"):
+                # "hi" = highlight/heading trafilatura (contenu) ; "head" est la
+                # balise <head> HTML (métadonnées : title/meta/script) qu'il ne
+                # faut PAS indexer comme titre de contenu.
+                if node.name == "hi":
                     text = node.get_text(strip=True)
                     if text:
                         elements.append(Element(
@@ -399,11 +402,12 @@ def _extract_html(file_path: str) -> list[Element]:
                             text=text, element_type="Table",
                             section=_current_section(elements),
                         ))
-                elif node.name == "p":
+                elif node.name in ("p", "li"):
                     text = node.get_text(strip=True)
                     if text:
+                        etype = "ListItem" if node.name == "li" else "NarrativeText"
                         elements.append(Element(
-                            text=text, element_type="NarrativeText",
+                            text=text, element_type=etype,
                             section=_current_section(elements),
                         ))
             if elements:

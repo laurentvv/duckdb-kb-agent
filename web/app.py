@@ -56,14 +56,18 @@ def get_context_from_db(query):
 
 
 def _format_chunk_context(chunks: list[dict]) -> str:
-    """Formate les chunks en contexte pour le LLM, avec citations (page/section)."""
+    """Formate les chunks en contexte pour le LLM, avec citations (page/section).
+
+    Le résumé prépendu est celui du document du chunk top-1 (le plus pertinent),
+    étiqueté avec son nom de fichier — et non un summary générique qui pourrait
+    appartenir à un document différent dans un résultat multi-docs.
+    """
     parts = []
-    # Résumé du document principal (aide à situer le contexte).
-    top_summary = next((c.get("summary") for c in chunks
-                        if c.get("summary") and not str(c["summary"]).startswith("No summary")),
-                       None)
-    if top_summary:
-        parts.append(f"[Résumé du document] {top_summary}\n")
+    if chunks:
+        top = chunks[0]
+        summary = top.get("summary")
+        if summary and not str(summary).startswith("No summary"):
+            parts.append(f"[Résumé de {top.get('file_name', 'document')}] {summary}\n")
     for c in chunks:
         cite = []
         if c.get("section"):
