@@ -16,6 +16,16 @@ L'utilisateur te donne un **chemin** (fichier ou dossier). Tu indexes ce chemin 
 4. Vérifie la sortie console. Si le script affiche `SUCCESS`, l'ingestion est complète (extraction structurée → chunks → métadonnées LLM → embedding document + embeddings chunks).
 5. Ajoute une entrée dans `log.md` : `* **Ingest** : C:\chemin\fichier.pdf ajouté à la BDD.`
 
+### Vision LLM (images & PDF scannés) — optionnel
+Par défaut, les images (PDF scannés, images embarquées dans les DOCX, fichiers `.png`/`.jpg` isolés) sont **ignorées** : seul le texte est indexé. Pour traiter ces images, ajoute `--vision` (ou définis `KB_VISION_ENABLED=1`) : elles sont alors envoyées à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui produit une transcription/description indexée comme un chunk normal.
+
+```bash
+uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf" --vision
+uv run skills/ingest-doc/run.py "C:\chemin\capture.png" --vision
+```
+
+⚠️ **Coût** : ~15-30s par image. La vision est **opt-in** ; si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas). Utilise `--vision` principalement pour les documents riches en images (modes opératoires avec captures d'écran, PDF scannés, schémas).
+
 ### Pipeline d'ingestion (détail)
 Chaque document subit, dans l'ordre :
 1. **Extraction structurée** (`parsing.extract_elements`) : le fichier est découpé en éléments typés (Title, NarrativeText, Table, ListItem) avec conservation du **numéro de page** (PDF) et de la **section** courante. Routeur par extension : PDF (pdfplumber, tables extraites), DOCX (python-docx, headings + tables), HTML (trafilatura), XLSX/CSV, texte/Markdown.

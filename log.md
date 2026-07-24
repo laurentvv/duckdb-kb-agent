@@ -43,3 +43,11 @@
   - **Tests** : 54 tests pytest verts (parsing, chunking, retrieval chunks, extraction binaire/CSV).
   - **Doc** : README + AGENTS.md mis à jour (pipeline chunks, schéma, dédoublonnage intelligent, embeddings chunk-level). Audit Unstructured-IO archivé dans `docs/audit-unstructured.md`.
   - **Audit** (`docs/audit-unstructured.md`) : évaluation de la lib Unstructured-IO pour le parsing. Conclusion : stack léger (pdfplumber/mammoth/trafilatura) retenu, plus adapté au contexte local Windows que Unstructured `hi_res` (torch exclu de Windows).
+* **2026-07-25 — Vision LLM (images & PDF scannés)** :
+  - **Objectif** : combler le trou fonctionnel — les images (PDF scannés, images embarquées DOCX, fichiers `.png`/`.jpg` isolés) étaient ignorées par l'extraction.
+  - **Approche** : vision LLM via **Ollama local**, modèle unique **Gemma 4 E4B** (multimodal, déjà présent — aucun modèle supplémentaire). Réutilise le `OCR_PROMPT` de la dépendance `pdf-ocr-ai` (transcription verbatim, tables Markdown, description UI/graphiques) mais fait l'appel VLM nous-même (timeout 300s configurable, vs 60s dur dans pdf-ocr-ai).
+  - **Nouveau module `vision.py`** : `describe_image(bytes)->str|None` (non bloquant, retry), `rasterize_page_to_png(pdf,page,dpi)->bytes`, `is_enabled()`.
+  - **Intégration `parsing.py`** : (1) routeur images isolées `.png/.jpg` → `_extract_image_file` ; (2) `_extract_pdf` pages sans texte ni table (PDF scannés) → rasterisation + VLM ; (3) `_extract_docx_python_docx` `inline_shapes` → VLM. Les descriptions sont poussées comme `Element` → chunking/embedding/résumé automatiques.
+  - **Opt-in** : `--vision` (CLI) ou `KB_VISION_ENABLED=1` (env), défaut off (coût ~15-30s/image). Dégradation gracieuse (VLM down → image skippée, pas de crash).
+  - **Bug de pdf-ocr-ai évité** : sa fonction `convert_pdf_to_markdown` rasterise toute page avec image/dessin (trop agressif) → non utilisée. On garde pdfplumber pour le texte/tables et on n'envoie au VLM que les vraies pages image.
+  - **Tests** : 65 tests pytest verts (11 nouveaux : mock VLM, intégration parsing, routing images). Doc (README + AGENTS.md) mise à jour.

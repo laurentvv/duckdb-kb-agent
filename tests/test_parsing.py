@@ -201,14 +201,16 @@ class TestBinaryAndEdgeCases:
     def test_binary_file_does_not_crash(self, tmp_path):
         """Un fichier binaire (.png) ne doit pas crasher extract_elements.
 
-        Il tombe dans _extract_text_file qui lit en UTF-8/cp1252 puis
-        errors=replace : on récupère du bruit mais pas de crash.
+        Sans vision, un .png tombe dans _extract_image_file qui retourne []
+        (l'image n'est pas indexable textuellement). Pas de crash, pas de bruit.
         """
         f = tmp_path / "fake.png"
         f.write_bytes(b"\x89PNG\r\n\x1a\n\xff\xfe\x00\x01\x02\x03binary\xff")
         # Ne doit pas lever d'exception.
         els = parsing.extract_elements(str(f))
-        assert isinstance(els, list)  # type: ignore[unused-ignore]
+        assert isinstance(els, list)
+        # Sans vision, aucune description -> liste vide (pas de bruit binaire).
+        assert els == []
 
     def test_csv_section_is_basename_not_full_path(self, tmp_path):
         """La section d'un CSV doit être le nom du fichier, pas le chemin absolu."""

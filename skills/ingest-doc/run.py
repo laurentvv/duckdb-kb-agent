@@ -130,7 +130,12 @@ def main():
     parser.add_argument("--force", action="store_true",
                         help="Force la ré-ingestion même si le contenu est identique "
                              "(recalcule summary/embeddings/chunks)")
+    parser.add_argument("--vision", action="store_true",
+                        help="Active la vision LLM : OCR/description des images "
+                             "(PDF scannés, images DOCX, .png/.jpg isolés). "
+                             "Coût ~15-30s/image. Aussi activable via KB_VISION_ENABLED=1.")
     args = parser.parse_args()
+    vision_enabled = args.vision or kb.VISION_ENABLED
 
     if not os.path.exists(args.file_path):
         print(f"File not found: {args.file_path}")
@@ -172,14 +177,17 @@ def main():
     # (vss doit être chargé ; on s'en assure via kb.connect côté insertion).
 
     # 3. Extraction structurée (éléments avec page/section/type) puis chunking
-    print(f"Extracting elements from {args.file_path}...")
+    if vision_enabled:
+        print(f"Extracting elements from {args.file_path} (vision LLM active)...")
+    else:
+        print(f"Extracting elements from {args.file_path}...")
     chunks = []  # liste de parsing.Chunk
     try:
         if args.no_chunks:
             text = extract_text(args.file_path)
             elements = []
         else:
-            elements = parsing.extract_elements(args.file_path)
+            elements = parsing.extract_elements(args.file_path, vision_enabled=vision_enabled)
             text = parsing.elements_to_text(elements)
             chunks = parsing.chunk_elements(elements)
             print(f"  -> {len(elements)} éléments, {len(chunks)} chunks.")
