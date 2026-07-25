@@ -9,6 +9,8 @@ __pycache__/
 knowledge.duckdb
 knowledge.duckdb.wal
 knowledge.backup-*.duckdb
+# Suivi de progression de la réindexation vision (local, régénérable)
+knowledge.reindex-vision-done.json
 
 # Documents sources (l'utilisateur fournit le chemin à l'ingestion, aucune
 # convention de dossier imposée — ne pas committer les documents métier).
