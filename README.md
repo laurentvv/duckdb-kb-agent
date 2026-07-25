@@ -107,6 +107,11 @@ Configuration (variables d'environnement) :
   uv run skills/migrate-db/run.py            # dry-run (lecture seule)
   uv run skills/migrate-db/run.py --apply    # exécute (sauvegarde automatique)
   ```
+- **Réindexer avec vision** (rendre les captures d'écran/images recherchables) — voir [`docs/REINDEXATION-VISION.md`](docs/REINDEXATION-VISION.md) pour la procédure détaillée :
+  ```bash
+  uv run skills/reindex-vision/run.py --limit 3                                  # test rapide
+  uv run skills/reindex-vision/run.py --filter "file_path ILIKE '%.docx'"        # DOCX seulement
+  ```
 
 ## 🧪 Tests
 
@@ -134,6 +139,7 @@ duckdb-kb-agent/
 ├── AGENTS.md               # Directives de l'agent IA
 ├── kb.py                   # Lib partagée (connexion DuckDB, embeddings, recherche hybride, get_chunk_id)
 ├── parsing.py              # Extraction structurée (PDF/DOCX/HTML/XLSX/txt) + chunking sémantique
+├── vision.py               # Vision LLM (OCR/description des images via Gemma 4 multimodal)
 ├── pyproject.toml          # Dépendances (uv)
 ├── knowledge.duckdb        # Base DuckDB (générée, non versionnée)
 ├── batch_ingest.py         # Ingestion en masse (depuis un chemin fourni)
@@ -143,8 +149,10 @@ duckdb-kb-agent/
 │   ├── embed-docs/         # Remplissage massif des embeddings (doc + chunks)
 │   ├── search-db/          # Recherche hybride chunk-level (FTS + vectoriel, fusion RRF)
 │   ├── reindex/            # Reconstruction de l'index FTS
+│   ├── reindex-vision/     # Réindexation avec vision LLM (captures d'écran, PDF scannés)
 │   └── migrate-db/         # Migration du schéma (non destructive)
 ├── bench/                  # Benchmark RAG (questions, run, comparatif)
+├── docs/                   # Documentation (audit Unstructured, réindexation vision)
 ├── tests/                  # Suite pytest
 └── web/                    # Interface FastAPI (chat)
 ```
