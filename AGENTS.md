@@ -16,20 +16,21 @@ L'utilisateur te donne un **chemin** (fichier ou dossier). Tu indexes ce chemin 
 4. Vérifie la sortie console. Si le script affiche `SUCCESS`, l'ingestion est complète (extraction structurée → chunks → métadonnées LLM → embedding document + embeddings chunks).
 5. Ajoute une entrée dans `log.md` : `* **Ingest** : C:\chemin\fichier.pdf ajouté à la BDD.`
 
-### Vision LLM (images & PDF scannés) — optionnel
-Par défaut, les images (PDF scannés, images embarquées dans les DOCX, fichiers `.png`/`.jpg` isolés) sont **ignorées** : seul le texte est indexé. Pour traiter ces images, ajoute `--vision` (ou définis `KB_VISION_ENABLED=1`) : elles sont alors envoyées à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui produit une transcription/description indexée comme un chunk normal.
+### Vision LLM (images, images embarquées & PDF scannés)
+Par défaut, les images (PDF scannés, images embarquées dans les PDF et DOCX, fichiers `.png`/`.jpg` isolés) sont **traitées automatiquement**. Elles sont envoyées à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui produit une transcription/description indexée comme un chunk normal.
 
 ```bash
-uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf" --vision
-uv run skills/ingest-doc/run.py "C:\chemin\capture.png" --vision
+# La vision est active par défaut
+uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf"
+uv run skills/ingest-doc/run.py "C:\chemin\capture.png"
 ```
 
-⚠️ **Coût** : ~15-30s par image. La vision est **opt-in** ; si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas). Utilise `--vision` principalement pour les documents riches en images (modes opératoires avec captures d'écran, PDF scannés, schémas).
+⚠️ **Coût** : ~15-30s par image. La vision est **opt-out** (activée par défaut via `KB_VISION_ENABLED=1`) ; si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas). Pour désactiver ce traitement coûteux en temps lors d'une ingestion massive de texte, définis `$env:KB_VISION_ENABLED=0`.
 
 ### Pipeline d'ingestion (détail)
 Chaque document subit, dans l'ordre :
 1. **Extraction structurée** (`parsing.extract_elements`) : le fichier est découpé en éléments typés (Title, NarrativeText, Table, ListItem) avec conservation du **numéro de page** (PDF) et de la **section** courante. Routeur par extension : PDF (pdfplumber, tables extraites), DOCX (python-docx, headings + tables), HTML (trafilatura), XLSX/CSV, texte/Markdown.
-2. **Chunking sémantique** (`parsing.chunk_elements`) : les éléments sont regroupés en chunks cohérents (~600-1200 car.) en respectant la structure (un titre démarre une nouvelle frontière si le chunk courant est assez gros ; une table reste dans un chunk dédié). Plafond de 100 chunks par document (anti-explosion).
+2. **Chunking sémantique (Parent-Enfant)** (`parsing.chunk_elements`) : les éléments sont regroupés en chunks "Parents" cohérents (~600-1200 car.) respectant la structure. Chaque Parent est ensuite découpé en "Enfants" de ~300 car. L'embedding est calculé sur l'enfant pour une précision maximale, mais c'est le texte Parent étendu (`parent_text`) qui est fourni en contexte au LLM. Plafond de 100 chunks par document.
 3. **Résumé LLM** (`analyze_text`) : summary + keywords via le modèle local.
 4. **Embeddings** : un embedding `bge-m3` (1024-dim) par document ET un embedding par chunk.
 5. **Insertion transactionnelle** dans `documents`, `document_content`, `document_ai_metadata`, `chunks`.
@@ -48,8 +49,8 @@ Chaque document porte un **embedding** (`bge-m3`, 1024-dim, dans `document_conte
 ## 4. Flux de Requête (Question / Réponse)
 Avant de répondre à **n'importe quelle** question posée par l'utilisateur concernant les documents :
 1. Tu DOIS utiliser ton moteur de recherche : `uv run skills/search-db/run.py "mots clés de la question"`. N'essaie pas de retrouver la réponse en lisant les fichiers sources directement.
-2. La recherche est **hybride** par défaut et opère au **niveau chunk** : elle combine Full-Text Search (BM25 sur `chunks.text`) et recherche vectorielle (cosine sur `chunks.embedding`) via une fusion Reciprocal Rank Fusion, regroupe les chunks par document (diversification des sources), puis renvoie les meilleurs extraits avec leurs **métadonnées de structure** (page, section, type d'élément). Tu peux isoler un moteur avec `--mode fts|vector|hybrid`.
-3. Formule ta réponse à l'utilisateur en te basant **exclusivement** sur ces extraits remontés par la BDD. **Cite la source** (fichier, page/section) quand l'information est disponible dans les métadonnées du chunk.
+2. La recherche est **hybride** par défaut et opère au **niveau chunk** : elle combine FTS (BM25) et vectoriel (cosine) via RRF. Elle remonte le contexte étendu (`parent_text`) du chunk enfant qui a matché pour maximiser la compréhension du LLM.
+3. Formule ta réponse à l'utilisateur en te basant **exclusivement** sur ces extraits remontés par la BDD. Utilise des balises XML strictes (`<document><source>...</source><content>...</content></document>`) si tu dois construire un prompt pour le LLM. **Cite la source** (fichier, page/section) en fin de phrase. Ne tombe jamais dans l'hallucination.
 
 ## 5. Maintenabilité
 Si tu rencontres une erreur avec un script d'un `skill` (ex: format de fichier non supporté), tu as l'autorisation de modifier le code Python du skill pour l'améliorer (ex: ajouter le support `.xlsx` dans `ingest-doc`).

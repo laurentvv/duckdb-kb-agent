@@ -210,7 +210,7 @@ def main():
         print("Warning: embedding échoué (Ollama/bge-m3 down ?) -> doc ingéré sans vecteur.")
 
     # 5b. Embeddings des chunks (non bloquant)
-    chunk_rows = []  # (id, doc_id, chunk_index, text, element_type, page_number, section, embedding)
+    chunk_rows = []  # (id, doc_id, chunk_index, text, parent_text, element_type, page_number, section, embedding)
     if chunks:
         print(f"Computing embeddings for {len(chunks)} chunks...")
         embed_ok = 0
@@ -219,7 +219,7 @@ def main():
             vec = kb.embed(kb.truncate(ch.text)) if ch.text.strip() else None
             if vec is not None:
                 embed_ok += 1
-            chunk_rows.append((ch_id, doc_id, ch.chunk_index, ch.text,
+            chunk_rows.append((ch_id, doc_id, ch.chunk_index, ch.text, ch.parent_text,
                                ch.element_type, ch.page_number, ch.section, vec))
         print(f"  -> {embed_ok}/{len(chunks)} chunks embeddés.")
 
@@ -251,9 +251,9 @@ def main():
         if chunk_rows:
             conn.executemany(
                 """INSERT INTO chunks
-                   (id, document_id, chunk_index, text, element_type,
+                   (id, document_id, chunk_index, text, parent_text, element_type,
                     page_number, section, embedding)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 chunk_rows,
             )
         conn.commit()

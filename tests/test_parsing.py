@@ -6,7 +6,6 @@ Teste extract_elements et chunk_elements sur des fichiers synthétiques :
   - chunking : frontières de titres, tables dédiées, longueurs, métadonnées.
 """
 
-import pytest
 
 import parsing
 
@@ -79,33 +78,34 @@ class TestChunkElements:
         chunks = parsing.chunk_elements(els)
         assert len(chunks) == 1
         assert chunks[0].text == "court texte"
+        assert chunks[0].parent_text == "court texte"
         assert chunks[0].chunk_index == 0
 
     def test_title_starts_new_chunk_when_large_enough(self):
-        """Un titre ouvre un nouveau chunk SI le chunk courant est assez gros
-        (>= section_min_chars). Sinon on accumule (anti-fragmentation)."""
-        # Cas 1 : chunk courant < section_min_chars -> accumulation (1 chunk).
+        """Un titre ouvre un nouveau parent SI le parent courant est assez gros."""
+        # Cas 1 : chunk courant < section_min_chars -> accumulation (1 parent).
         els_small = [
             parsing.Element("intro " * 50, "NarrativeText"),   # ~250 car < 400
             parsing.Element("Chapitre 2", "Title"),
             parsing.Element("contenu chapitre 2", "NarrativeText"),
         ]
         chunks_small = parsing.chunk_elements(els_small)
-        assert len(chunks_small) == 1   # pas de frontière (trop petit)
+        # Ils sont tous dans le même parent.
+        assert len(set(c.parent_text for c in chunks_small)) == 1
 
-        # Cas 2 : chunk courant >= section_min_chars -> frontière (>= 2 chunks).
+        # Cas 2 : chunk courant >= section_min_chars -> frontière (>= 2 parents).
         els_large = [
             parsing.Element("intro " * 100, "NarrativeText"),  # ~500 car >= 400
             parsing.Element("Chapitre 2", "Title"),
             parsing.Element("contenu chapitre 2", "NarrativeText"),
         ]
         chunks_large = parsing.chunk_elements(els_large)
-        assert len(chunks_large) >= 2  # le titre provoque un flush
-        ch_with_title = [c for c in chunks_large if "Chapitre 2" in c.text or c.section == "Chapitre 2"]
-        assert ch_with_title, "le titre doit apparaître dans un chunk (texte ou section)"
+        assert len(set(c.parent_text for c in chunks_large)) >= 2
+        ch_with_title = [c for c in chunks_large if "Chapitre 2" in c.parent_text or c.section == "Chapitre 2"]
+        assert ch_with_title, "le titre doit apparaître dans un chunk"
 
     def test_table_is_dedicated_chunk(self):
-        """Une table doit former son propre chunk (non fusionnée avec du texte)."""
+        """Une table doit former ses propres chunks enfants sous un même parent."""
         table_text = "A\tB\n1\t2\n3\t4"
         els = [
             parsing.Element("texte avant", "NarrativeText"),
@@ -114,8 +114,8 @@ class TestChunkElements:
         ]
         chunks = parsing.chunk_elements(els)
         table_chunks = [c for c in chunks if c.element_type == "Table"]
-        assert len(table_chunks) == 1
-        assert table_chunks[0].text == table_text
+        assert len(table_chunks) >= 1
+        assert table_chunks[0].parent_text == table_text
         assert table_chunks[0].page_number == 1
 
     def test_long_element_is_split(self):
@@ -139,8 +139,8 @@ class TestChunkElements:
             parsing.Element("deuxième", "NarrativeText", page_number=4, section="Intro"),
         ]
         chunks = parsing.chunk_elements(els)
-        # Les deux sont fusionnés (court) -> 1 chunk avec page_number du premier = 3.
-        assert len(chunks) == 1
+        # Les deux sont fusionnés (court) -> 1 parent
+        assert len(set(c.parent_text for c in chunks)) == 1
         assert chunks[0].page_number == 3
         assert chunks[0].section == "Intro"
 

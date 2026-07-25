@@ -96,7 +96,7 @@ class TestEmbedDocs:
     def test_truncates_long_docs(self, embed_skill, tmpdb):
         """Le texte envoyé à embed est tronqué à MAX_TEXT_CHARS (8000)."""
         captured = run_skill(embed_skill, tmpdb)
-        assert all(l <= kb.MAX_TEXT_CHARS for l in captured)
+        assert all(length <= kb.MAX_TEXT_CHARS for length in captured)
 
     def test_idempotent(self, embed_skill, tmpdb):
         """Une 2e exécution ne recalcule rien (tous déjà embeddés)."""

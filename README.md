@@ -17,8 +17,8 @@
 
 ### ✨ Key Features
 - **Structured extraction**: PDF (pdfplumber, tables + page numbers), Word (python-docx, tables + headings), HTML (trafilatura), Office/Excel — all routed automatically.
-- **Semantic chunking**: documents are split into structure-aware chunks (titles as boundaries, tables preserved, ~600-1200 chars) so every passage is vectorized and retrievable.
-- **Hybrid retrieval (chunk-level)**: BM25 (exact match) + bge-m3 embeddings (semantic) fused via Reciprocal Rank Fusion, with per-document diversification.
+- **Semantic chunking (Parent-Child)**: documents are split into structure-aware chunks (titles as boundaries, tables preserved, ~600-1200 chars). These "Parent" chunks are then subdivided into smaller "Child" chunks (~300 chars) for maximum embedding precision, while the LLM is fed the entire Parent chunk to retain maximum context.
+- **Hybrid retrieval (chunk-level)**: BM25 (exact match) + bge-m3 embeddings (semantic) fused via Reciprocal Rank Fusion, with per-document diversification. Contexts are injected into the LLM prompt using strict XML tags (`<document><source>...</source><content>...</content></document>`) to prevent hallucinations.
 - **Verifiable citations**: each result carries page number, section and element type, so the agent can cite its sources.
 - **Zero Cloud**: 100% local (Ollama for embeddings + LLM, DuckDB for storage/search). No external API.
 - **Agent-First Architecture**: a strict `AGENTS.md` manifesto instructs the AI on how to interact with the database using isolated Python scripts (`skills/`).
@@ -67,24 +67,24 @@ Le dédoublonnage est **intelligent** : un document non modifié (même contenu)
 uv run uvicorn web.app:app --reload
 ```
 
-### Vision LLM (images & PDF scannés) — optionnel
+### Vision LLM (images, images embarquées & PDF scannés)
 
-Par défaut, les images (PDF scannés, images embarquées dans les DOCX, fichiers `.png`/`.jpg` isolés) sont **ignorées** : seul le texte est indexé. L'option **vision** les envoie à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui génère une transcription/description indexée comme un chunk normal.
+Par défaut, les images (PDF scannés, images embarquées dans les PDF et DOCX, fichiers `.png`/`.jpg` isolés) sont **traitées automatiquement** et envoyées à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui génère une transcription/description indexée comme un chunk normal.
 
 ```bash
-# Activer la vision pour un document (--vision)
-uv run skills/ingest-doc/run.py "C:\chemin\capture.png" --vision
-uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf" --vision
+# Ingestion standard avec vision active par défaut
+uv run skills/ingest-doc/run.py "C:\chemin\capture.png"
+uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf"
 
-# Ou activer globalement via une variable d'environnement
-set KB_VISION_ENABLED=1
+# Si besoin de désactiver pour gagner du temps
+set KB_VISION_ENABLED=0
 uv run batch_ingest.py "C:\chemin\dossier"
 ```
 
-⚠️ **Coût** : chaque image = ~15-30s d'appel au VLM. La vision est donc **opt-in** (désactivée par défaut) pour ne pas exploser le temps d'ingestion. Si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas).
+⚠️ **Coût** : chaque image = ~15-30s d'appel au VLM. La vision est donc **opt-out** (activée par défaut). Si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas).
 
 Configuration (variables d'environnement) :
-- `KB_VISION_ENABLED=1` — active la vision globalement
+- `KB_VISION_ENABLED=0` — désactive la vision globalement (par défaut : 1)
 - `KB_VISION_MODEL` — modèle multimodal (défaut : le même Gemma 4 que le chat)
 - `KB_VISION_DPI` — résolution de rasterisation des pages PDF (défaut : 200)
 - `KB_VISION_TIMEOUT` — timeout par image en secondes (défaut : 300)
@@ -126,8 +126,8 @@ uv run pytest -m integration       # + tests d'intégration (nécessitent knowle
 documents              id (hash SHA-256 du contenu) PK, file_name, file_path, category, indexed_at
 document_content       document_id PK (1:1), raw_text (texte complet), embedding FLOAT[1024]
 document_ai_metadata   document_id PK (1:1), summary (LLM), keywords VARCHAR[]
-chunks                 id PK, document_id FK, chunk_index, text, element_type,
-                       page_number, section, embedding FLOAT[1024]
+chunks                 id PK, document_id FK, chunk_index, text, parent_text TEXT,
+                       element_type, page_number, section, embedding FLOAT[1024]
 ```
 
 Index : FTS (BM25) sur `document_content.raw_text` et `chunks.text` ; HNSW (cosine) sur `document_content.embedding` et `chunks.embedding`.

@@ -38,6 +38,7 @@ class Chunk:
     """Chunk produit par ``chunk_elements`` (sérialisable en ligne DuckDB)."""
 
     text: str
+    parent_text: str | None = None
     element_type: str = "NarrativeText"
     page_number: int | None = None
     section: str | None = None
@@ -123,6 +124,15 @@ def _extract_pdf(file_path: str, vision_enabled: bool = False) -> list[Element]:
         return _extract_pdf_fitz(file_path, vision_enabled)
 
     elements: list[Element] = []
+    
+    fitz_doc_for_images = None
+    if vision_enabled:
+        try:
+            import fitz  # type: ignore
+            fitz_doc_for_images = fitz.open(file_path)
+        except Exception:
+            pass
+
     try:
         with pdfplumber.open(file_path) as pdf:
             for page_no, page in enumerate(pdf.pages, start=1):
@@ -175,12 +185,37 @@ def _extract_pdf(file_path: str, vision_enabled: bool = False) -> list[Element]:
                         page_number=page_no,
                         section=_current_section(elements),
                     ))
+                
+                if vision_enabled and fitz_doc_for_images:
+                    try:
+                        fitz_page = fitz_doc_for_images[page_no - 1]
+                        for img in fitz_page.get_images(full=True):
+                            xref = img[0]
+                            base_image = fitz_doc_for_images.extract_image(xref)
+                            image_bytes = base_image.get("image")
+                            ext = base_image.get("ext", "png")
+                            if not image_bytes:
+                                continue
+                            import vision  # type: ignore
+                            mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                            desc = vision.describe_image(image_bytes, mime=mime)
+                            if desc:
+                                elements.append(Element(
+                                    text=desc, element_type="NarrativeText",
+                                    page_number=page_no,
+                                    section=_current_section(elements),
+                                ))
+                    except Exception as e:
+                        print(f"  [vision] ECHEC images PDF ({os.path.basename(file_path)} page {page_no}): {e}")
     except Exception as e:
         # Repli PyMuPDF si pdfplumber échoue.
         try:
-            return _extract_pdf_fitz(file_path)
+            return _extract_pdf_fitz(file_path, vision_enabled)
         except Exception:
             raise ValueError(f"Échec extraction PDF ({file_path}) : {e}") from e
+    finally:
+        if fitz_doc_for_images:
+            fitz_doc_for_images.close()
     return elements
 
 
@@ -274,6 +309,27 @@ def _extract_pdf_fitz(file_path: str, vision_enabled: bool = False) -> list[Elem
                     page_number=page_no,
                     section=_current_section(elements),
                 ))
+                
+            if vision_enabled:
+                try:
+                    for img in page.get_images(full=True):
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image.get("image")
+                        ext = base_image.get("ext", "png")
+                        if not image_bytes:
+                            continue
+                        import vision  # type: ignore
+                        mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                        desc = vision.describe_image(image_bytes, mime=mime)
+                        if desc:
+                            elements.append(Element(
+                                text=desc, element_type="NarrativeText",
+                                page_number=page_no,
+                                section=_current_section(elements),
+                            ))
+                except Exception as e:
+                    print(f"  [vision] ECHEC images PDF ({os.path.basename(file_path)} page {page_no}): {e}")
     finally:
         doc.close()
     return elements
@@ -708,12 +764,17 @@ def chunk_elements(
         nonlocal current_text
         text = current_text.strip()
         if text:
-            chunks.append(Chunk(
-                text=text,
-                element_type=current_meta["element_type"],
-                page_number=current_meta["page_number"],
-                section=current_meta["section"],
-            ))
+            # Chunking Parent-Enfant : Le parent (text) est découpé en petits enfants
+            child_max_chars = 300
+            child_overlap = 50
+            for child in _split_long_text(text, child_max_chars, child_overlap):
+                chunks.append(Chunk(
+                    text=child,
+                    parent_text=text,
+                    element_type=current_meta["element_type"],
+                    page_number=current_meta["page_number"],
+                    section=current_meta["section"],
+                ))
         current_text = ""
 
     for el in elements:
@@ -732,17 +793,19 @@ def chunk_elements(
         if el.element_type == "Table":
             _flush()
             if len(text) <= CHUNK_TABLE_MAX_CHARS:
-                chunks.append(Chunk(
-                    text=text, element_type="Table",
-                    page_number=el.page_number, section=el.section,
-                ))
+                for child in _split_long_text(text, 300, 50):
+                    chunks.append(Chunk(
+                        text=child, parent_text=text, element_type="Table",
+                        page_number=el.page_number, section=el.section,
+                    ))
             else:
                 # Grande table : on la découpe en tranches de lignes.
                 for sub in _split_long_text(text, max_chars, overlap):
-                    chunks.append(Chunk(
-                        text=sub, element_type="Table",
-                        page_number=el.page_number, section=el.section,
-                    ))
+                    for child in _split_long_text(sub, 300, 50):
+                        chunks.append(Chunk(
+                            text=child, parent_text=sub, element_type="Table",
+                            page_number=el.page_number, section=el.section,
+                        ))
             # Initialiser le prochain chunk avec les métadonnées courantes.
             current_meta = {"element_type": "NarrativeText",
                             "page_number": el.page_number, "section": el.section}
@@ -752,10 +815,11 @@ def chunk_elements(
         if len(text) > max_chars:
             _flush()
             for sub in _split_long_text(text, max_chars, overlap):
-                chunks.append(Chunk(
-                    text=sub, element_type=el.element_type,
-                    page_number=el.page_number, section=el.section,
-                ))
+                for child in _split_long_text(sub, 300, 50):
+                    chunks.append(Chunk(
+                        text=child, parent_text=sub, element_type=el.element_type,
+                        page_number=el.page_number, section=el.section,
+                    ))
             continue
 
         # Élément normal : l'ajouter au chunk courant si la place le permet.
@@ -801,7 +865,7 @@ def _split_long_text(text: str, max_chars: int, overlap: int) -> list[str]:
         end = min(start + max_chars, n)
         if end < n:
             # Chercher une coupure naturelle dans la dernière fenêtre.
-            window = text[start:end]
+            # window removed
             # Dernière ponctuation de phrase ou newline dans le dernier quart.
             search_start = max(start, end - max_chars // 4)
             cut = max(

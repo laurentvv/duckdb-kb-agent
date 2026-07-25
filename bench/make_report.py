@@ -18,7 +18,7 @@ CRITERIA = [("F", "Fidélité"), ("P", "Précision"), ("C", "Complétude"), ("H"
 
 def load_jsonl(path):
     with open(path, encoding="utf-8") as f:
-        return [json.loads(l) for l in f if l.strip()]
+        return [json.loads(line) for line in f if line.strip()]
 
 
 def main():

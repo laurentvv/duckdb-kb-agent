@@ -11,7 +11,6 @@ On teste :
 
 import types
 
-import pytest
 
 import kb
 import parsing

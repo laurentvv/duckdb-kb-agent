@@ -18,10 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-import parsing
-import kb
-import duckdb
-import hashlib
+import parsing  # noqa: E402
+import kb  # noqa: E402
 
 
 # get_chunk_id est centralisé dans kb.py pour garantir un hash cohérent.
@@ -55,12 +53,12 @@ def main():
                 # n'est plus accessible, on chunk le raw_text directement.
                 try:
                     elements = parsing.extract_elements(file_path)
-                    text = parsing.elements_to_text(elements)
+                    pass  # unused text assignment removed
                 except Exception:
                     # Fallback : chunker le raw_text brut (pas de structure).
                     elements = [parsing.Element(line.strip(), "NarrativeText")
                                 for line in raw_text.splitlines() if line.strip()]
-                    text = raw_text
+                    pass  # unused text assignment removed
 
                 chunks = parsing.chunk_elements(elements)
                 # Embeddings des chunks.

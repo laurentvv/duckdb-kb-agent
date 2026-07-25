@@ -57,7 +57,7 @@ def rebuild_hnsw(con):
             "ON chunks USING HNSW (embedding) WITH (metric = 'cosine');"
         )
         print("Index HNSW reconstruit (chunks).")
-    except Exception as e:
+    except Exception:
         # Table chunks absente (base non migrée) : on ignore silencieusement.
         pass
 
