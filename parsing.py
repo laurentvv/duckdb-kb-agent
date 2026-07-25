@@ -447,13 +447,23 @@ def _extract_docx_python_docx(file_path: str, vision_enabled: bool = False) -> l
     # Images embarquées (inline_shapes) : description via VLM si activée.
     # Ajoutées en fin de document (l'ordre exact dans le flux serait complexe à
     # reconstruire ; pour le retrieval, la section courante suffit à les situer).
+    #
+    # NB : python-docx 1.2 n'expose PAS ``shape.image`` (AttributeError). La bonne
+    # API est de remonter le ``r:embed`` (rId) dans le XML de la shape, puis de
+    # résoudre l'image via ``doc.part.related_parts[rId]``.
     if vision_enabled:
         import vision  # type: ignore  # noqa: PLC0415
         for shape in getattr(doc, "inline_shapes", []) or []:
             try:
-                blob = shape.image.blob
-                mime = getattr(shape.image, "content_type", None) or "image/png"
-                desc = vision.describe_image(blob.read(), mime=mime)
+                inline = shape._inline
+                blip = inline.graphic.graphicData.pic.blipFill.blip
+                embed = blip.embed  # rId vers l'image
+                part = doc.part.related_parts[embed]
+                mime = getattr(part, "content_type", None) or "image/png"
+                img_bytes = part.blob
+                if not img_bytes:
+                    continue
+                desc = vision.describe_image(img_bytes, mime=mime)
                 if desc:
                     elements.append(Element(
                         text=desc, element_type="NarrativeText",
