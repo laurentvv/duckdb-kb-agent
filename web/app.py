@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+import json
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -56,37 +57,31 @@ def get_context_from_db(query):
 
 
 def _format_chunk_context(chunks: list[dict]) -> str:
-    """Formate les chunks en contexte pour le LLM, avec citations (page/section).
-
-    Le résumé prépendu est celui du document du chunk top-1 (le plus pertinent),
-    étiqueté avec son nom de fichier — et non un summary générique qui pourrait
-    appartenir à un document différent dans un résultat multi-docs.
-    """
+    """Formate les chunks en contexte XML pour le LLM (anti-hallucination)."""
     parts = []
-    if chunks:
-        top = chunks[0]
-        summary = top.get("summary")
-        if summary and not str(summary).startswith("No summary"):
-            parts.append(f"[Résumé de {top.get('file_name', 'document')}] {summary}\n")
-    for c in chunks:
-        cite = []
-        if c.get("section"):
-            cite.append(f"section: {c['section']}")
-        if c.get("page_number") is not None:
-            cite.append(f"page {c['page_number']}")
-        cite_str = f" ({', '.join(cite)})" if cite else ""
-        header = f"--- {c['file_name']} — {c.get('element_type', 'Texte')}{cite_str} ---"
-        parts.append(f"{header}\n{c['text']}\n")
+    for i, c in enumerate(chunks, start=1):
+        source = f"{c['file_name']} - Page {c['page_number']}" if c.get('page_number') else c.get('file_name', 'Source Inconnue')
+        parts.append(f'<document index="{i}">\n  <source>{source}</source>\n  <content>{c["text"]}</content>\n</document>\n')
     return "\n".join(parts)
 
 
 def _chunk_sources(chunks: list[dict]) -> list[str]:
-    """Liste des noms de documents sources (dédoublonnés, ordre de pertinence)."""
+    """Liste des noms de documents sources (dédoublonnés) avec numéro de page et section."""
     seen = []
     for c in chunks:
         name = c.get("file_name")
-        if name and name not in seen:
-            seen.append(name)
+        if not name:
+            continue
+        
+        parts = [name]
+        if c.get("page_number"):
+            parts.append(f"p.{c['page_number']}")
+        if c.get("section"):
+            parts.append(c["section"])
+            
+        label = " - ".join(parts)
+        if label not in seen:
+            seen.append(label)
     return seen
 
 @app.get("/", response_class=HTMLResponse)
@@ -100,23 +95,35 @@ async def ask_question(req: QueryRequest):
     context, sources = get_context_from_db(question)
     
     if not sources:
-        return {"answer": "Je n'ai trouvé aucun document pertinent dans la base de connaissances pour cette question.", "sources": []}
+        async def mock_stream():
+            yield f"data: {json.dumps({'sources': [], 'chunk': 'Je n\\'ai trouvé aucun document pertinent dans la base de connaissances pour cette question.'})}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(mock_stream(), media_type="text/event-stream")
     
-    prompt = f"""Tu es un assistant technique expert. Utilise UNIQUEMENT le contexte ci-dessous pour répondre à la question de manière précise et structurée. Ne mentionne pas que tu es une IA.
+    system_prompt = "Answer only from the document context below. Do not fall back to your general knowledge. If they do not contain enough information, reply that you do not have the information needed to answer and name what is missing. Never invent information. Ground your answer strictly in these documents and cite their sources."
+    prompt = f"### Instruction \n {question} \n\n ### Context \n {context} \n\n ### Answer \n"
     
-CONTEXTE :
-{context}
-
-QUESTION :
-{question}
-"""
-    try:
-        response = client.chat.completions.create(
-          model=OLLAMA_MODEL,
-          messages=[{"role": "user", "content": prompt}],
-          temperature=0.1
-        )
-        answer = response.choices[0].message.content
-        return {"answer": answer, "sources": sources}
-    except Exception as e:
-        return {"answer": f"Erreur lors de la génération avec Ollama: {str(e)}", "sources": []}
+    async def generate():
+        # Envoie immédiat des sources détectées
+        yield f"data: {json.dumps({'sources': sources, 'chunk': ''})}\n\n"
+        
+        try:
+            response = client.chat.completions.create(
+              model=OLLAMA_MODEL,
+              messages=[
+                  {"role": "system", "content": system_prompt},
+                  {"role": "user", "content": prompt}
+              ],
+              temperature=0.1,
+              stream=True
+            )
+            for chunk in response:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield f"data: {json.dumps({'chunk': delta})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'chunk': f'\n\n**Erreur**: {str(e)}'})}\n\n"
+            yield "data: [DONE]\n\n"
+            
+    return StreamingResponse(generate(), media_type="text/event-stream")
