@@ -12,7 +12,7 @@ Beaucoup de documents métier (modes opératoires, procédures) contiennent des 
 
 1. **C'est LONG** : ~15-30 secondes par image détectée. Pour 169 documents, prévoir **plusieurs heures** (variable selon le nombre d'images par document).
 2. **Opt-in** : la vision n'est activée que pour cette réindexation — les futures ingestions restent sans vision sauf si tu ajoutes `--vision`.
-3. **Reprise** : tu peux interrompre (Ctrl+C) et relancer — les documents déjà retraités avec vision ne seront pas refaits (le hash change car le contenu indexé change).
+3. **Reprise via suivi explicite** : la réindexation utilise `--force` (le fichier source binaire n'a pas changé, donc le hash est identique et le dédoublonnage classique le skipp). Pour permettre la reprise, le script conserve un **fichier de suivi** `knowledge.reindex-vision-done.json` à côté de la base, qui liste les `doc_id` déjà retraités avec succès. En cas d'interruption (Ctrl+C), relancer le script reprend là où il s'est arrêté (les docs déjà faits sont ignorés). Pour repartir de zéro : `--reset`.
 4. **Ollama requis** : le modèle Gemma 4 E4B (`hf.co/unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL`) doit être présent. Vérifier :
    ```bash
    curl http://localhost:11434/api/tags
@@ -22,7 +22,7 @@ Beaucoup de documents métier (modes opératoires, procédures) contiennent des 
 
 ### Option A — Script dédié (recommandé)
 
-Le script `skills/reindex-vision/run.py` automatise tout : il parcourt les documents existants, purge l'ancienne version, et ré-ingère avec `--vision --force`. Il gère la reprise et affiche l'ETA.
+Le script `skills/reindex-vision/run.py` automatise tout : il parcourt les documents existants, purge l'ancienne version, et ré-ingère avec `--vision --force`. Il gère la **reprise via un fichier de suivi** (`knowledge.reindex-vision-done.json`) et affiche l'ETA.
 
 ```bash
 cd D:\GIT\duckdb-kb-agent
@@ -38,6 +38,9 @@ uv run skills/reindex-vision/run.py --filter "file_path ILIKE '%.pdf'"
 
 # 4. Réindexer TOUT
 uv run skills/reindex-vision/run.py
+
+# 5. Repartir de zéro (efface le suivi de progression)
+uv run skills/reindex-vision/run.py --reset
 ```
 
 **Lancer en arrière-plan** (pour ne pas bloquer le terminal) :
