@@ -739,7 +739,6 @@ def chunk_elements(
     elements: list[Element],
     max_chars: int = CHUNK_MAX_CHARS,
     overlap: int = CHUNK_OVERLAP,
-    min_merge: int = CHUNK_MIN_MERGE,
     section_min_chars: int = CHUNK_SECTION_MIN_CHARS,
 ) -> list[Chunk]:
     """Découpe les éléments en chunks cohérents (structure-aware).

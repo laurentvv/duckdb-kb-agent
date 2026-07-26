@@ -4,6 +4,7 @@ import json
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
+# pylint: disable=duplicate-code
 import os
 import sys
 from pathlib import Path
@@ -96,7 +97,8 @@ async def ask_question(req: QueryRequest):
     
     if not sources:
         async def mock_stream():
-            yield f"data: {json.dumps({'sources': [], 'chunk': 'Je n\\'ai trouvé aucun document pertinent dans la base de connaissances pour cette question.'})}\n\n"
+            msg = json.dumps({'sources': [], 'chunk': "Je n'ai trouvé aucun document pertinent dans la base de connaissances pour cette question."})
+            yield f"data: {msg}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(mock_stream(), media_type="text/event-stream")
     

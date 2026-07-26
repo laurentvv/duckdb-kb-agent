@@ -120,6 +120,11 @@ uv run pytest                      # tests unitaires (base temporaire, mock LLM/
 uv run pytest -m integration       # + tests d'intégration (nécessitent knowledge.duckdb)
 ```
 
+### 💡 Expérimentation Headroom (Refus stratégique)
+Une intégration du SDK **Headroom** a été testée et benchmarkée (`bench/run_bench_headroom.py`) pour compresser le contexte RAG en entrée du LLM. 
+**Résultat :** Bien que la compression puisse atteindre jusqu'à 90% d'économie de tokens sans dégrader la qualité des réponses (avec prompt strict en français et `target_ratio=0.5`), le coût en latence (~+3 secondes par requête pour charger le modèle ML Kompress localement) dépasse les bénéfices pour une architecture **100% locale** (Zéro Cloud).
+**Décision :** Headroom a été retiré du projet car les tokens d'entrée locaux (Ollama) n'ont pas de coût financier direct, et la vitesse de réponse (UX) est prioritaire. Le code et les dépendances ont été purgés pour maintenir le projet léger.
+
 ## 🧱 Schéma de la base
 
 ```text
