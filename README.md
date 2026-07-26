@@ -61,7 +61,7 @@ uv run batch_ingest.py "C:\chemin\vers\dossier" --extensions .pdf .docx
 
 Le dédoublonnage est **intelligent** : un document non modifié (même contenu) est skippé, un document modifié (même chemin, contenu différent) est **mis à jour** (l'ancienne version et ses chunks sont purgés puis remplacés). `--force` force la ré-ingestion.
 
-### Interface web (chat)
+### Interface web (chat avec streaming SSE)
 
 ```bash
 uv run uvicorn web.app:app --reload
