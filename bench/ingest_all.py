@@ -13,18 +13,16 @@ Usage :
 
 import sys
 import time
-import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
-import parsing
-import kb
-import duckdb
-from openai import OpenAI
-from conftest import load_skill
+import parsing  # noqa: E402
+import kb  # noqa: E402
+from openai import OpenAI  # noqa: E402
+from conftest import load_skill  # noqa: E402
 
 ingest = load_skill("ingest-doc")
 

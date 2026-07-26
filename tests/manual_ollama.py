@@ -11,8 +11,11 @@ Nécessite :
 
 import os
 import sys
+from pathlib import Path
 
-import duckdb
+# Lib partagée (cwd = racine du projet à l'exécution)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import kb
 from openai import OpenAI
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
@@ -21,47 +24,32 @@ client = OpenAI(base_url=OLLAMA_BASE_URL, api_key="ollama")
 
 
 def get_context_from_db(query):
-    con = duckdb.connect("knowledge.duckdb", read_only=True)
+    con = kb.connect("knowledge.duckdb", read_only=True)
     try:
-        con.execute("LOAD fts;")
-        # L'expression BM25 est répétée dans le WHERE (l'alias du SELECT n'y est
-        # pas visible en SQL standard).
-        res = con.execute(
-            """
-            SELECT d.file_path, dc.raw_text,
-                   fts_main_document_content.match_bm25(dc.document_id, ?) AS score
-            FROM document_content dc
-            JOIN documents d ON dc.document_id = d.id
-            WHERE fts_main_document_content.match_bm25(dc.document_id, ?) IS NOT NULL
-            ORDER BY score DESC
-            LIMIT 2
-            """,
-            [query, query],
-        ).fetchall()
-
-        if res:
-            combined_context = ""
-            for r in res:
-                combined_context += f"--- Document: {r[0]} ---\n{r[1][:3000]}\n\n"
-            return combined_context
-        return "Aucun document trouvé."
+        results = kb.hybrid_search_chunks(con, query, k=5, mode="hybrid")
+        if not results:
+            return ""
+            
+        xml_context = ""
+        for i, r in enumerate(results, start=1):
+            source = f"{r['file_name']} - Page {r['page_number']}" if r.get('page_number') else r['file_name']
+            xml_context += f'<document index="{i}">\n  <source>{source}</source>\n  <content>{r["text"]}</content>\n</document>\n\n'
+        return xml_context
     finally:
         con.close()
 
 
 def ask_ollama(question, context):
-    prompt = f"""Tu es un assistant technique expert. Voici un extrait de la base documentaire technique. Rédige une procédure claire étape par étape en utilisant UNIQUEMENT ce contexte.
-
-CONTEXTE RETOURNÉ PAR LA BDD :
-{context}
-
-QUESTION :
-{question}
-"""
+    system_prompt = "Answer only from the document context below. Do not fall back to your general knowledge. If they do not contain enough information, reply that you do not have the information needed to answer and name what is missing. Never invent information. Ground your answer strictly in these documents and cite their sources."
+    
+    prompt = f"### Instruction \n {question} \n\n ### Context \n {context} \n\n ### Answer \n"
     try:
         response = client.chat.completions.create(
             model=OLLAMA_MODEL,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.1,
         )
         return response.choices[0].message.content
@@ -75,6 +63,9 @@ if __name__ == "__main__":
     print(f"Question : {q}")
     print("> Recherche dans DuckDB...")
     context = get_context_from_db(q)
-    print("> Appel du LLM...")
-    answer = ask_ollama(q, context)
-    print(f"\n=> RÉPONSE :\n{answer}\n")
+    if not context:
+        print("> Aucun document trouvé.")
+    else:
+        print("> Appel du LLM...")
+        answer = ask_ollama(q, context)
+        print(f"\n=> RÉPONSE :\n{answer}\n")

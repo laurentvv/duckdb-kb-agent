@@ -168,6 +168,7 @@ def add_chunks_table(con, dry):
                     document_id VARCHAR,
                     chunk_index INTEGER,
                     text TEXT,
+                    parent_text TEXT,
                     element_type VARCHAR,
                     page_number INTEGER,
                     section VARCHAR,
@@ -181,9 +182,9 @@ def add_chunks_table(con, dry):
         print("  [skip] table chunks déjà présente.")
 
     # 2. Index FTS sur chunks.text.
-    has_fts = con.execute(
+    con.execute(
         "SELECT COUNT(*) FROM duckdb_indexes() WHERE index_name = 'chunks_fts_index'"
-    ).fetchone()[0]
+    ).fetchone()
     # Le nom de l'index FTS créé par PRAGMA est interne ; on tente et on ignore si existe.
     if dry:
         print("  [dry-run] création index FTS sur chunks.text.")
@@ -277,6 +278,30 @@ def add_embedding_column(con, dry):
     return True
 
 
+def add_parent_text_column(con, dry):
+    """Ajoute chunks.parent_text TEXT pour le chunking Parent-Enfant.
+    
+    Idempotent.
+    """
+    has_table = con.execute(
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema = 'main' AND table_name = 'chunks'"
+    ).fetchone()[0]
+    if has_table == 0:
+        return True # Sera créé par add_chunks_table
+        
+    ctype = column_type(con, "chunks", "parent_text")
+    if ctype is not None:
+        print("  [skip] colonne parent_text déjà présente dans chunks.")
+    else:
+        if dry:
+            print("  [dry-run] ajout colonne parent_text TEXT dans chunks.")
+        else:
+            con.execute("ALTER TABLE chunks ADD COLUMN parent_text TEXT;")
+            print("  [ok] colonne parent_text TEXT ajoutée à chunks.")
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--apply", action="store_true",
@@ -310,13 +335,15 @@ def main():
         ok4 = add_embedding_column(con, dry=not args.apply)
         print("\n[4/4] Table chunks + index FTS/HNSW :")
         ok5 = add_chunks_table(con, dry=not args.apply)
+        print("\n[5/5] Colonne parent_text (Parent-Enfant) :")
+        ok6 = add_parent_text_column(con, dry=not args.apply)
     finally:
         con.close()
 
     print("\n=== Migration terminée ===")
     if not args.apply:
         print("Dry-run : aucune donnée écrite. Relancer avec --apply pour exécuter.")
-    if not (ok1 and ok2 and ok3 and ok4 and ok5):
+    if not (ok1 and ok2 and ok3 and ok4 and ok5 and ok6):
         print("Des étapes ont été sautées ou bloquées (voir ci-dessus).")
         sys.exit(2)
 

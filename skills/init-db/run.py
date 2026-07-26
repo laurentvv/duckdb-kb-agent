@@ -64,6 +64,7 @@ def init_db(db_path: str = DB_PATH) -> None:
                 document_id VARCHAR,
                 chunk_index INTEGER,
                 text TEXT,
+                parent_text TEXT,
                 element_type VARCHAR,
                 page_number INTEGER,
                 section VARCHAR,

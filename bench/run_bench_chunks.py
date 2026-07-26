@@ -88,7 +88,7 @@ def search_context(query: str) -> tuple[str, list[str]]:
         if total + len(chunk_text) > CTX_MAX_TOTAL:
             chunk_text = chunk_text[: CTX_MAX_TOTAL - total]
         context_parts.append(
-            f"--- {c['file_name']} — {c.get('element_type','Texte')}{cite_str} ---\n{chunk_text}"
+            f'<document index="{len(seen_docs)+1}">\n  <source>{c["file_name"]}{cite_str}</source>\n  <content>{chunk_text}</content>\n</document>'
         )
         total += len(chunk_text)
         if c["file_name"] not in seen_docs:
@@ -99,13 +99,13 @@ def search_context(query: str) -> tuple[str, list[str]]:
 
 
 def build_prompt(question: str, context: str) -> str:
-    return f"""Tu es un assistant technique expert. Réponds à la question en te basant UNIQUEMENT sur le contexte fourni ci-dessous. Si la réponse ne s'y trouve pas, dis-le clairement. Sois précis et concis.
+    return f"""### Instruction
+{question}
 
-CONTEXTE :
+### Context
 {context}
 
-QUESTION :
-{question}
+### Answer
 """
 
 
@@ -134,10 +134,14 @@ def strip_thinking(text: str) -> str:
 
 def ask_model(client, model: str, prompt: str, timeout: float = 180):
     t0 = time.time()
+    system_prompt = "Answer only from the document context below. Do not fall back to your general knowledge. If they do not contain enough information, reply that you do not have the information needed to answer and name what is missing. Never invent information. Ground your answer strictly in these documents and cite their sources."
     try:
         resp = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.1,
             timeout=timeout,
         )

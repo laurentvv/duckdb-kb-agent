@@ -7,6 +7,7 @@ documents métier réels. Skippés automatiquement si la base n'existe pas.
 """
 
 import subprocess
+import os
 from pathlib import Path
 
 import pytest
@@ -33,9 +34,11 @@ def _skip_without_db():
 
 
 def run_search(query: str) -> str:
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
     res = subprocess.run(
         ["uv", "run", "skills/search-db/run.py", query],
-        cwd=str(ROOT), capture_output=True, text=True, check=False,
+        cwd=str(ROOT), capture_output=True, text=True, check=False, encoding="utf-8", errors="replace", env=env
     )
     return res.stdout
 
@@ -45,6 +48,6 @@ def test_search_returns_expected_document(question, expected):
     output = run_search(question)
     # Soit un résultat trouvé contenant le terme attendu, soit aucun résultat.
     # On valide juste que la recherche s'exécute et renvoie du contenu cohérent.
-    assert "Result" in output or "No results" in output
-    if "Result" in output:
+    assert "Chunk" in output or "No results" in output
+    if "Chunk" in output:
         assert expected.lower() in output.lower() or "No results" in output

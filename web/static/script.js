@@ -99,10 +99,71 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ question })
             });
 
-            const data = await response.json();
-            
             removeTypingIndicator();
-            addMessage(data.answer, 'bot', data.sources);
+            
+            // Create a message placeholder
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message bot-msg`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'msg-content';
+            msgDiv.appendChild(contentDiv);
+            
+            chatContainer.appendChild(msgDiv);
+            
+            let fullText = '';
+            let sourcesAdded = false;
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, {stream: true});
+                let newlineIdx;
+                
+                while ((newlineIdx = buffer.indexOf('\n\n')) >= 0) {
+                    const message = buffer.slice(0, newlineIdx);
+                    buffer = buffer.slice(newlineIdx + 2);
+                    
+                    if (message.startsWith('data: ')) {
+                        const dataStr = message.slice(6);
+                        if (dataStr === '[DONE]') continue;
+                        
+                        try {
+                            const data = JSON.parse(dataStr);
+                            
+                            if (data.sources && !sourcesAdded) {
+                                const sourcesDiv = document.createElement('div');
+                                sourcesDiv.className = 'msg-sources';
+                                
+                                data.sources.forEach(source => {
+                                    const badge = document.createElement('span');
+                                    badge.className = 'source-badge';
+                                    badge.innerHTML = `
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                                        ${source}
+                                    `;
+                                    sourcesDiv.appendChild(badge);
+                                });
+                                msgDiv.appendChild(sourcesDiv);
+                                sourcesAdded = true;
+                            }
+                            
+                            if (data.chunk) {
+                                fullText += data.chunk;
+                                contentDiv.innerHTML = marked.parse(fullText);
+                                scrollToBottom();
+                            }
+                        } catch(e) {
+                            console.error("Error parsing JSON", e, dataStr);
+                        }
+                    }
+                }
+            }
 
         } catch (error) {
             console.error('Error:', error);

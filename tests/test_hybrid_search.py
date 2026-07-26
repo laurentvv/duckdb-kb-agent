@@ -4,7 +4,6 @@ Tourne sur une base temporaire avec des embeddings factices : aucun appel Ollama
 On mocke kb.embed pour contrôler le vecteur de requête.
 """
 
-import duckdb
 import pytest
 
 import kb

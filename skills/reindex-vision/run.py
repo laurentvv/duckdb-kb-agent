@@ -140,12 +140,12 @@ def main():
                         break
             else:
                 failed += 1
-                print(f"      ÉCHEC (pas de SUCCESS)", flush=True)
+                print("      ÉCHEC (pas de SUCCESS)", flush=True)
                 if res.stderr:
                     print(f"      {res.stderr[:150]}", flush=True)
         except subprocess.TimeoutExpired:
             failed += 1
-            print(f"      TIMEOUT (15 min) — document skippé", flush=True)
+            print("      TIMEOUT (15 min) — document skippé", flush=True)
         except subprocess.CalledProcessError as e:
             failed += 1
             print(f"      ERREUR: {str(e)[:100]}", flush=True)

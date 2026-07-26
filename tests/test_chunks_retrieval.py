@@ -4,7 +4,6 @@ Tourne sur une base temporaire avec une table chunks peuplée et des embeddings
 factices (4-dim) : aucun appel Ollama. On mocke kb.embed pour le vecteur requête.
 """
 
-import duckdb
 import pytest
 
 import kb
@@ -27,28 +26,28 @@ def tmpdb(tmp_path):
     con.execute(
         """CREATE TABLE chunks (
             id VARCHAR PRIMARY KEY, document_id VARCHAR, chunk_index INTEGER,
-            text TEXT, element_type VARCHAR, page_number INTEGER,
+            text TEXT, parent_text TEXT, element_type VARCHAR, page_number INTEGER,
             section VARCHAR, embedding FLOAT[4])"""
     )
 
     # 2 documents, chacun découpé en 2 chunks. Embeddings 4-dim calibrés pour
     # favoriser le chunk "install sage 100" (docA-c0).
     data = [
-        # (chunk_id, doc_id, idx, text, etype, page, section, embedding, file_name)
-        ("docA-c0", "docA", 0, "installation du client sage 100 sur windows",
+        # (chunk_id, doc_id, idx, text, parent_text, etype, page, section, embedding, file_name)
+        ("docA-c0", "docA", 0, "installation du client sage 100 sur windows", "parent docA-c0",
          "NarrativeText", 1, "Installation", [1.0, 0.0, 0.0, 0.0], "sage100.md"),
-        ("docA-c1", "docA", 1, "configuration reseau et pare-feu sage 100",
+        ("docA-c1", "docA", 1, "configuration reseau et pare-feu sage 100", "parent docA-c1",
          "NarrativeText", 2, "Réseau", [0.9, 0.1, 0.0, 0.0], "sage100.md"),
-        ("docB-c0", "docB", 0, "sauvegarde base sql serveur automate",
+        ("docB-c0", "docB", 0, "sauvegarde base sql serveur automate", "parent docB-c0",
          "Table", 1, "Sauvegarde", [0.0, 0.0, 0.1, 1.0], "backup.md"),
-        ("docB-c1", "docB", 1, "restauration plan de reprise activite",
+        ("docB-c1", "docB", 1, "restauration plan de reprise activite", "parent docB-c1",
          "NarrativeText", 5, "Restauration", [0.0, 0.0, 0.0, 0.9], "backup.md"),
     ]
-    for cid, did, idx, txt, et, pg, sec, emb, name in data:
+    for cid, did, idx, txt, ptxt, et, pg, sec, emb, name in data:
         con.execute(
-            """INSERT INTO chunks (id, document_id, chunk_index, text, element_type,
-               page_number, section, embedding) VALUES (?,?,?,?,?,?,?,?)""",
-            [cid, did, idx, txt, et, pg, sec, emb],
+            """INSERT INTO chunks (id, document_id, chunk_index, text, parent_text, element_type,
+               page_number, section, embedding) VALUES (?,?,?,?,?,?,?,?,?)""",
+            [cid, did, idx, txt, ptxt, et, pg, sec, emb],
         )
     # Documents et metadata (une fois chacun).
     con.execute("INSERT INTO documents (id, file_name, file_path) VALUES ('docA','sage100.md','/data/sage100.md')")

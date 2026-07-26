@@ -7,7 +7,6 @@ fichiers temporaires (tmp_path) ou :memory:.
 import json
 
 import duckdb
-import pytest
 
 from conftest import load_skill
 
@@ -98,7 +97,7 @@ class TestMigrateDb:
         db = tmp_path / "old.duckdb"
         self._make_old_schema(db)
 
-        rc = migrate.main.__wrapped__ if hasattr(migrate.main, "__wrapped__") else None
+        # rc removed
         # On appelle via argparse en mockant sys.argv
         import sys
         old_argv = sys.argv

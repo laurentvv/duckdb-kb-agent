@@ -22,14 +22,14 @@ EMBED_MODEL = os.getenv("KB_EMBED_MODEL", "bge-m3:latest")
 EMBED_DIM = 1024
 
 # --- Vision LLM (OCR/description des images : PDF scannés, images DOCX, .png) ---
-# Opt-in (défaut off) car un appel VLM = ~15-30s/image. Active avec
-# KB_VISION_ENABLED=1 ou --vision (CLI ingest-doc). Réutilise le MÊME modèle que
+# Opt-out (défaut on) même si un appel VLM = ~15-30s/image. Désactive avec
+# KB_VISION_ENABLED=0. Réutilise le MÊME modèle que
 # le chat (Gemma 4 E4B est multimodal) -> aucun modèle supplémentaire à puller.
 # Format OpenAI-compatible (suffixe /v1) pour le client openai.OpenAI.
 LLM_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/") + "/v1"
 VISION_MODEL = os.getenv("KB_VISION_MODEL",
                          "hf.co/unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL")
-VISION_ENABLED = os.getenv("KB_VISION_ENABLED", "").lower() in ("1", "true", "yes")
+VISION_ENABLED = os.getenv("KB_VISION_ENABLED", "1").lower() in ("1", "true", "yes")
 VISION_TIMEOUT = int(os.getenv("KB_VISION_TIMEOUT", "300"))  # s (vs 60 dur dans pdf-ocr-ai)
 VISION_DPI = int(os.getenv("KB_VISION_DPI", "200"))          # rasterisation pages (compromis perf)
 MAX_TEXT_CHARS = 8000  # bge-m3 limite ~8192 tokens ; troncature par défaut.
@@ -184,9 +184,6 @@ def hybrid_search(con, query: str, k: int = 3,
         #  - bonus sur les top-rangs FTS (signaux de match exact type URL/commande),
         #    MAIS uniquement si le doc est aussi dans le pool vectoriel (validation
         #    croisée). Cela évite de sur-pondérer un doc lexicalement proche mais
-        #    sémantiquement hors-sujet (ex. "RDS" pour une requête "Sage 100").
-        #  - vectoriel légèrement pondéré pour capter synonymes et intention.
-        vec_ids = {h["document_id"] for h in vec_hits}
         # Top-K vectoriel resserré pour la validation croisée du bonus FTS.
         vec_top_ids = {h["document_id"] for h in vec_hits[:RRF_FTS_VALIDATE_TOP]}
         rrf = {}
@@ -360,7 +357,7 @@ def hybrid_search_chunks(con, query: str, k: int = 5,
     rows = con.execute(
         f"""
         SELECT c.id, c.document_id, c.chunk_index, c.text, c.element_type,
-               c.page_number, c.section, d.file_name, d.file_path, m.summary
+               c.page_number, c.section, d.file_name, d.file_path, m.summary, c.parent_text
         FROM chunks c
         JOIN documents d ON c.document_id = d.id
         LEFT JOIN document_ai_metadata m ON c.document_id = m.document_id
@@ -379,7 +376,8 @@ def hybrid_search_chunks(con, query: str, k: int = 5,
             "chunk_id": h["chunk_id"],
             "document_id": m[1],
             "chunk_index": m[2],
-            "text": m[3],
+            "text": m[10] if (len(m) > 10 and m[10]) else m[3],  # Parent-Enfant : on renvoie le gros contexte
+            "search_match": m[3],  # Pour débug, le texte précis qui a matché
             "element_type": m[4],
             "page_number": m[5],
             "section": m[6],
