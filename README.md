@@ -1,163 +1,189 @@
 <div align="center">
-      <h1>🦆 DuckDB KB Agent</h1>
-      <p><b>Agentic Knowledge Base & Document Management System</b></p>
-      <p>
-        <img src="https://img.shields.io/badge/Python-3.14-blue?logo=python&logoColor=white" alt="Python 3.14" />
-        <img src="https://img.shields.io/badge/Package_Manager-uv-purple" alt="uv" />
-        <img src="https://img.shields.io/badge/Database-DuckDB-yellow?logo=duckdb" alt="DuckDB" />
-        <img src="https://img.shields.io/badge/Architecture-Agentic-success" alt="Agentic Architecture" />
-      </p>
-    </div>
+  <img src="docs/duckdb_kb_hero.jpg" alt="DuckDB KB Agent Hero" width="800" />
+  <h1>🦆 DuckDB KB Agent</h1>
+  <p><b>Agentic Knowledge Base & Document Management System</b></p>
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.14-blue?logo=python&logoColor=white" alt="Python 3.14" />
+    <img src="https://img.shields.io/badge/Package_Manager-uv-purple" alt="uv" />
+    <img src="https://img.shields.io/badge/Database-DuckDB-yellow?logo=duckdb" alt="DuckDB" />
+    <img src="https://img.shields.io/badge/Architecture-Agentic-success" alt="Agentic Architecture" />
+  </p>
+</div>
 
-    ## 💡 About
-**DuckDB KB Agent** is a paradigm shift from traditional Markdown-based wikis. Instead of human-maintained documentation, this system is designed to be **operated entirely by an AI Coding Agent** (e.g.,
-  Antigravity, Cline).
+<br/>
 
-  The agent uses specialized Python skills to ingest raw documents (PDF, Word, Excel, HTML), extract **structured elements** (titles, paragraphs, tables) with metadata (page number, section, element type), chunk them semantically, and store everything in a **DuckDB database**. It answers user queries using a **hybrid retrieval** (BM25 Full-Text Search + vector embeddings via Reciprocal Rank Fusion) at the **chunk level**, with verifiable source citations.
+## 💡 About
 
-### ✨ Key Features
-- **Structured extraction**: PDF (pdfplumber, tables + page numbers), Word (python-docx, tables + headings), HTML (trafilatura), Office/Excel — all routed automatically.
-- **Semantic chunking (Parent-Child)**: documents are split into structure-aware chunks (titles as boundaries, tables preserved, ~600-1200 chars). These "Parent" chunks are then subdivided into smaller "Child" chunks (~300 chars) for maximum embedding precision, while the LLM is fed the entire Parent chunk to retain maximum context.
-- **Hybrid retrieval (chunk-level)**: BM25 (exact match) + bge-m3 embeddings (semantic) fused via Reciprocal Rank Fusion, with per-document diversification. Contexts are injected into the LLM prompt using strict XML tags (`<document><source>...</source><content>...</content></document>`) to prevent hallucinations.
-- **Verifiable citations**: each result carries page number, section and element type, so the agent can cite its sources.
-- **Zero Cloud**: 100% local (Ollama for embeddings + LLM, DuckDB for storage/search). No external API.
-- **Agent-First Architecture**: a strict `AGENTS.md` manifesto instructs the AI on how to interact with the database using isolated Python scripts (`skills/`).
-- **Modern Stack**: Python 3.14, `uv`, Pydantic, DuckDB (FTS + vss/HNSW).
+**DuckDB KB Agent** represents a paradigm shift from traditional Markdown-based wikis. Instead of human-maintained documentation, this system is designed to be **operated entirely by an AI Coding Agent** (e.g., Antigravity, Cline).
 
-## 🛠️ Prérequis
+The agent utilizes specialized Python skills to ingest raw documents (PDF, Word, Excel, HTML), extract **structured elements** (titles, paragraphs, tables) with metadata (page number, section, element type), segment them semantically, and store everything in a **DuckDB database**. It answers user queries using a **hybrid retrieval** system (BM25 Full-Text Search + vector embeddings via Reciprocal Rank Fusion) at the **chunk level**, providing verifiable source citations.
 
-- **Python 3.14** et **[uv](https://docs.astral.sh/uv/)**.
-- **[Ollama](https://ollama.com/)** démarré en local, avec :
-  - un modèle de génération (chat web + analyse à l'ingestion) — configurable via `OLLAMA_BASE_URL` et `OLLAMA_MODEL` ;
-  - le modèle d'**embedding** `bge-m3` (`ollama pull bge-m3`) pour la recherche vectorielle (configurable via `KB_EMBED_MODEL`).
-  - pour la **vision** (images/PDF scannés, *optionnel*) : un modèle multimodal. Par défaut le même Gemma 4 (qui est multimodal) — aucun modèle supplémentaire à installer.
-- Les documents sources : l'utilisateur fournit leur chemin à l'ingestion (fichier ou dossier local/réseau). Aucun dossier `raw/` imposé ; les documents ne sont pas versionnés (voir `.gitignore`).
+---
 
-## 🚀 Démarrage
+## ✨ Key Features
+
+- **Structured Extraction**: Automatically routes and extracts PDF (pdfplumber, tables + page numbers), Word (python-docx, tables + headings), HTML (trafilatura), and Office/Excel documents.
+- **Semantic Chunking (Parent-Child)**: Documents are split into structure-aware chunks (using titles as boundaries, preserving tables, ~600-1200 chars). These "Parent" chunks are then subdivided into smaller "Child" chunks (~300 chars) for maximum embedding precision, while the entire Parent chunk is fed to the LLM to retain maximum context.
+- **Hybrid Retrieval (Chunk-Level)**: BM25 (exact match) + `bge-m3` embeddings (semantic) fused via Reciprocal Rank Fusion, with per-document diversification. Contexts are injected into the LLM prompt using strict XML tags (`<document><source>...</source><content>...</content></document>`) to prevent hallucinations.
+- **Verifiable Citations**: Each result carries page number, section, and element type, enabling the agent to cite its sources accurately.
+- **Zero Cloud**: 100% local operation (Ollama for embeddings + LLM, DuckDB for storage/search). No external APIs required.
+- **Agent-First Architecture**: A strict `AGENTS.md` manifesto instructs the AI on how to interact with the database using isolated Python scripts (`skills/`).
+- **Modern Stack**: Built with Python 3.14, `uv`, Pydantic, and DuckDB (FTS + vss/HNSW).
+
+---
+
+## 🛠️ Prerequisites
+
+- **Python 3.14** and **[uv](https://docs.astral.sh/uv/)**.
+- **Ollama** running locally (for embeddings) and/or a remote server for generation. 
+  Configuration is handled via a **`.env`** file at the root:
+  
+  ```env
+  # LLM for text generation (chat, summary, RAG)
+  KB_LLM_BASE_URL="http://10.201.12.50:8080" # (optional) Leave empty to use local Ollama
+  OLLAMA_MODEL="gemma-4-E4B-it-Q4_K_M.gguf"
+
+  # Embedding model for vectorization (local Ollama by default)
+  OLLAMA_BASE_URL="http://localhost:11434"
+  KB_EMBED_MODEL="bge-m3:latest"
+  ```
+- **Source Documents**: The user provides the document paths at ingestion (local/network file or folder). No forced `raw/` folder; documents are not versioned (see `.gitignore`).
+
+---
+
+## 🚀 Getting Started
 
 ```bash
-# 1. Installer les dépendances
+# 1. Install dependencies
 uv sync
 
-# 2. Initialiser la base DuckDB (tables + index FTS + index vectoriel HNSW)
+# 2. Initialize the DuckDB database (tables + FTS index + HNSW vector index)
 uv run skills/init-db/run.py
 
-# 3. Ingestion d'un document
-#    (extraction structurée + chunking + embedding doc + embeddings chunks + résumé LLM)
-uv run skills/ingest-doc/run.py "C:\chemin\vers\document.pdf" --category "Tech"
+# 3. Ingest a document
+#    (structured extraction + chunking + doc embedding + chunk embeddings + LLM summary)
+uv run skills/ingest-doc/run.py "C:\path\to\document.pdf" --category "Tech"
 
-# 4. Recherche hybride (FTS + vectoriel, fusion RRF) — par défaut
-uv run skills/search-db/run.py "mots clés" --limit 3
-#    modes isolables : --mode fts | vector | hybrid
+# 4. Hybrid search (FTS + vector, RRF fusion) — default mode
+uv run skills/search-db/run.py "keywords" --limit 3
+#    isolated modes: --mode fts | vector | hybrid
 ```
 
-### Ingestion en masse
+### Bulk Ingestion
 
 ```bash
-uv run batch_ingest.py "C:\chemin\vers\dossier" --category "Exploitation"
-# Filtrer par extensions :
-uv run batch_ingest.py "C:\chemin\vers\dossier" --extensions .pdf .docx
+uv run batch_ingest.py "C:\path\to\folder" --category "Operations"
+# Filter by extensions:
+uv run batch_ingest.py "C:\path\to\folder" --extensions .pdf .docx
 ```
 
-Le dédoublonnage est **intelligent** : un document non modifié (même contenu) est skippé, un document modifié (même chemin, contenu différent) est **mis à jour** (l'ancienne version et ses chunks sont purgés puis remplacés). `--force` force la ré-ingestion.
+Deduplication is **smart**: an unmodified document (same content) is skipped, while a modified document (same path, different content) is **updated** (the old version and its chunks are purged and replaced). Use `--force` to force re-ingestion.
 
-### Interface web (chat avec streaming SSE)
+### Web Interface (Chat with SSE streaming)
 
 ```bash
 uv run uvicorn web.app:app --reload
 ```
 
-### Vision LLM (images, images embarquées & PDF scannés)
+### LLM Vision (Images, Embedded Images & Scanned PDFs)
 
-Par défaut, les images (PDF scannés, images embarquées dans les PDF et DOCX, fichiers `.png`/`.jpg` isolés) sont **traitées automatiquement** et envoyées à un modèle multimodal local (Gemma 4, déjà présent — aucun modèle supplémentaire) qui génère une transcription/description indexée comme un chunk normal.
+By default, images (scanned PDFs, embedded images in PDFs and DOCX, isolated `.png`/`.jpg` files) are **processed automatically** and sent to a local multimodal model (Gemma 4, already included — no extra model required) which generates a transcription/description indexed as a normal chunk.
 
 ```bash
-# Ingestion standard avec vision active par défaut
-uv run skills/ingest-doc/run.py "C:\chemin\capture.png"
-uv run skills/ingest-doc/run.py "C:\chemin\pdf_scanné.pdf"
+# Standard ingestion with vision active by default
+uv run skills/ingest-doc/run.py "C:\path\to\screenshot.png"
+uv run skills/ingest-doc/run.py "C:\path\to\scanned_pdf.pdf"
 
-# Si besoin de désactiver pour gagner du temps
-set KB_VISION_ENABLED=0
-uv run batch_ingest.py "C:\chemin\dossier"
+# If you need to disable it to save time, add to the .env file:
+# KB_VISION_ENABLED=0
+uv run batch_ingest.py "C:\path\to\folder"
 ```
 
-⚠️ **Coût** : chaque image = ~15-30s d'appel au VLM. La vision est donc **opt-out** (activée par défaut). Si le VLM est indisponible, l'image est skippée silencieusement (l'ingestion ne crash pas).
+⚠️ **Cost**: each image takes ~15-30s of VLM processing time. Vision is therefore **opt-out** (enabled by default). If the VLM is unavailable, the image is silently skipped (ingestion does not crash).
 
-Configuration (variables d'environnement) :
-- `KB_VISION_ENABLED=0` — désactive la vision globalement (par défaut : 1)
-- `KB_VISION_MODEL` — modèle multimodal (défaut : le même Gemma 4 que le chat)
-- `KB_VISION_DPI` — résolution de rasterisation des pages PDF (défaut : 200)
-- `KB_VISION_TIMEOUT` — timeout par image en secondes (défaut : 300)
+Configuration (in the **`.env`** file):
+- `KB_VISION_ENABLED=0` — globally disables vision (default: 1)
+- `KB_VISION_MODEL` — multimodal model (default: same Gemma 4 used for chat)
+- `KB_VISION_DPI` — rasterization resolution for PDF pages (default: 200)
+- `KB_VISION_TIMEOUT` — timeout per image in seconds (default: 300)
+
+---
 
 ## 🔧 Maintenance
 
-- **Reconstruire l'index FTS** (après des ingestions massives ou résultats incohérents) :
+- **Rebuild the FTS index** (after massive ingestions or inconsistent results):
   ```bash
   uv run skills/reindex/run.py
   ```
-- **(Re)calculer les embeddings** (document et/ou chunks) — reprise sécurisée :
+- **(Re)calculate embeddings** (document and/or chunks) — safe resume:
   ```bash
-  uv run skills/embed-docs/run.py                       # docs/chunks sans embedding
-  uv run skills/embed-docs/run.py --rebuild             # recalculer tout
-  uv run skills/embed-docs/run.py --chunks-only         # embeddings de chunks uniquement
-  uv run skills/embed-docs/run.py --filter "file_path ILIKE '%\\sage\\%'"   # sous-ensemble
+  uv run skills/embed-docs/run.py                       # docs/chunks without embedding
+  uv run skills/embed-docs/run.py --rebuild             # recalculate all
+  uv run skills/embed-docs/run.py --chunks-only         # chunk embeddings only
+  uv run skills/embed-docs/run.py --filter "file_path ILIKE '%\\folder\\%'"   # subset
   ```
-- **Migrer une base ancienne** vers le schéma courant (clés primaires, `keywords` en liste, colonne `embedding` + index HNSW, **table `chunks`** + index FTS/HNSW) :
+- **Migrate an older database** to the current schema (primary keys, `keywords` as list, `embedding` column + HNSW index, **`chunks` table** + FTS/HNSW index):
   ```bash
-  uv run skills/migrate-db/run.py            # dry-run (lecture seule)
-  uv run skills/migrate-db/run.py --apply    # exécute (sauvegarde automatique)
+  uv run skills/migrate-db/run.py            # dry-run (read only)
+  uv run skills/migrate-db/run.py --apply    # execute (automatic backup)
   ```
-- **Réindexer avec vision** (rendre les captures d'écran/images recherchables) — voir [`docs/REINDEXATION-VISION.md`](docs/REINDEXATION-VISION.md) pour la procédure détaillée :
+- **Reindex with vision** (make screenshots/images searchable) — see [`docs/REINDEXATION-VISION.md`](docs/REINDEXATION-VISION.md) for detailed procedure:
   ```bash
-  uv run skills/reindex-vision/run.py --limit 3                                  # test rapide
-  uv run skills/reindex-vision/run.py --filter "file_path ILIKE '%.docx'"        # DOCX seulement
+  uv run skills/reindex-vision/run.py --limit 3                                  # quick test
+  uv run skills/reindex-vision/run.py --filter "file_path ILIKE '%.docx'"        # DOCX only
   ```
 
-## 🧪 Tests
+---
+
+## 🧪 Testing
 
 ```bash
-uv run pytest                      # tests unitaires (base temporaire, mock LLM/embedding)
-uv run pytest -m integration       # + tests d'intégration (nécessitent knowledge.duckdb)
+uv run pytest                      # unit tests (temporary db, mock LLM/embedding)
+uv run pytest -m integration       # + integration tests (requires knowledge.duckdb)
 ```
 
-### 💡 Expérimentation Headroom (Refus stratégique)
-Une intégration du SDK **Headroom** a été testée et benchmarkée (`bench/run_bench_headroom.py`) pour compresser le contexte RAG en entrée du LLM. 
-**Résultat :** Bien que la compression puisse atteindre jusqu'à 90% d'économie de tokens sans dégrader la qualité des réponses (avec prompt strict en français et `target_ratio=0.5`), le coût en latence (~+3 secondes par requête pour charger le modèle ML Kompress localement) dépasse les bénéfices pour une architecture **100% locale** (Zéro Cloud).
-**Décision :** Headroom a été retiré du projet car les tokens d'entrée locaux (Ollama) n'ont pas de coût financier direct, et la vitesse de réponse (UX) est prioritaire. Le code et les dépendances ont été purgés pour maintenir le projet léger.
+### 💡 Headroom Experimentation (Strategic Rejection)
+An integration of the **Headroom** SDK was tested and benchmarked (`bench/run_bench_headroom.py`) to compress the RAG context input for the LLM. 
+**Result:** Although compression can reach up to 90% token savings without degrading response quality (with strict prompt and `target_ratio=0.5`), the latency cost (~+3 seconds per query to load the ML Kompress model locally) outweighs the benefits for a **100% local** (Zero Cloud) architecture.
+**Decision:** Headroom was removed from the project as local input tokens (Ollama) have no direct financial cost, and response speed (UX) is the priority. Code and dependencies were purged to keep the project lightweight.
 
-## 🧱 Schéma de la base
+---
+
+## 🧱 Database Schema
 
 ```text
-documents              id (hash SHA-256 du contenu) PK, file_name, file_path, category, indexed_at
-document_content       document_id PK (1:1), raw_text (texte complet), embedding FLOAT[1024]
+documents              id (SHA-256 hash of content) PK, file_name, file_path, category, indexed_at
+document_content       document_id PK (1:1), raw_text (full text), embedding FLOAT[1024]
 document_ai_metadata   document_id PK (1:1), summary (LLM), keywords VARCHAR[]
 chunks                 id PK, document_id FK, chunk_index, text, parent_text TEXT,
                        element_type, page_number, section, embedding FLOAT[1024]
 ```
 
-Index : FTS (BM25) sur `document_content.raw_text` et `chunks.text` ; HNSW (cosine) sur `document_content.embedding` et `chunks.embedding`.
+Indexes: FTS (BM25) on `document_content.raw_text` and `chunks.text`; HNSW (cosine) on `document_content.embedding` and `chunks.embedding`.
+
+---
 
 ## 📂 Architecture
 
 ```text
 duckdb-kb-agent/
-├── AGENTS.md               # Directives de l'agent IA
-├── kb.py                   # Lib partagée (connexion DuckDB, embeddings, recherche hybride, get_chunk_id)
-├── parsing.py              # Extraction structurée (PDF/DOCX/HTML/XLSX/txt) + chunking sémantique
-├── vision.py               # Vision LLM (OCR/description des images via Gemma 4 multimodal)
-├── pyproject.toml          # Dépendances (uv)
-├── knowledge.duckdb        # Base DuckDB (générée, non versionnée)
-├── batch_ingest.py         # Ingestion en masse (depuis un chemin fourni)
-├── skills/                 # Outils de l'agent
-│   ├── init-db/            # Création de la base + tables + index FTS + index vectoriel HNSW
+├── AGENTS.md               # AI Agent directives
+├── kb.py                   # Shared lib (DuckDB connection, embeddings, hybrid search, get_chunk_id)
+├── parsing.py              # Structured extraction (PDF/DOCX/HTML/XLSX/txt) + semantic chunking
+├── vision.py               # LLM Vision (OCR/image description via multimodal Gemma 4)
+├── pyproject.toml          # Dependencies (uv)
+├── knowledge.duckdb        # DuckDB database (generated, not versioned)
+├── batch_ingest.py         # Mass ingestion (from a provided path)
+├── skills/                 # Agent tools
+│   ├── init-db/            # DB creation + tables + FTS index + HNSW vector index
 │   ├── ingest-doc/         # Extraction + chunking + insertion + embeddings (Ollama)
-│   ├── embed-docs/         # Remplissage massif des embeddings (doc + chunks)
-│   ├── search-db/          # Recherche hybride chunk-level (FTS + vectoriel, fusion RRF)
-│   ├── reindex/            # Reconstruction de l'index FTS
-│   ├── reindex-vision/     # Réindexation avec vision LLM (captures d'écran, PDF scannés)
-│   └── migrate-db/         # Migration du schéma (non destructive)
-├── bench/                  # Benchmark RAG (questions, run, comparatif)
-├── docs/                   # Documentation (audit Unstructured, réindexation vision)
-├── tests/                  # Suite pytest
-└── web/                    # Interface FastAPI (chat)
+│   ├── embed-docs/         # Massive embedding backfill (doc + chunks)
+│   ├── search-db/          # Chunk-level hybrid search (FTS + vector, RRF fusion)
+│   ├── reindex/            # FTS index reconstruction
+│   ├── reindex-vision/     # Reindex with LLM vision (screenshots, scanned PDFs)
+│   └── migrate-db/         # Schema migration (non-destructive)
+├── bench/                  # RAG Benchmark (questions, run, comparative)
+├── docs/                   # Documentation (Unstructured audit, vision reindexing)
+├── tests/                  # Pytest suite
+└── web/                    # FastAPI interface (chat)
 ```
