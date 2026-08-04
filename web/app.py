@@ -25,7 +25,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import kb
 from sentence_transformers import CrossEncoder
 
-cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+_cross_encoder = None
+
+def get_cross_encoder():
+    global _cross_encoder
+    if _cross_encoder is None:
+        _cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
+    return _cross_encoder
 
 app = FastAPI()
 
@@ -64,7 +70,8 @@ def get_context_from_db(query):
         if chunks:
             # Reranking avec Cross-Encoder
             pairs = [[query, c["text"]] for c in chunks]
-            scores = cross_encoder.predict(pairs)
+            encoder = get_cross_encoder()
+            scores = encoder.predict(pairs)
             for i, chunk in enumerate(chunks):
                 chunk["rerank_score"] = scores[i]
 
@@ -137,6 +144,8 @@ def rewrite_query(question: str) -> str:
             temperature=0.3,
             max_tokens=100
         )
+        if not response.choices:
+            return question
         rewritten = response.choices[0].message.content.strip()
         # Fallback if the LLM returns something too weird
         if not rewritten or len(rewritten) > 200:
@@ -184,6 +193,8 @@ Tu DOIS répondre au format JSON strict avec les clés suivantes :
             response_format={"type": "json_object"}
         )
 
+        if not response.choices:
+            raise ValueError("Empty choices returned from LLM")
         raw_content = response.choices[0].message.content
         latency = time.time() - start_time
         

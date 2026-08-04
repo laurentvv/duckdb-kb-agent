@@ -54,12 +54,12 @@ async def run_golden_tests():
 
     print("\n=== Rapport d'évaluation ===")
     print(f"Total des tests : {len(golden_tests)}")
-    print(f"Succès (Confiance > 0.7) : {success_count} ({(success_count/50)*100:.1f}%)")
-    print(f"Rejets (Confiance < 0.7) : {low_confidence_count} ({(low_confidence_count/50)*100:.1f}%)")
-    print(f"Erreurs : {error_count} ({(error_count/50)*100:.1f}%)")
+    print(f"Succès (Confiance > 0.7) : {success_count} ({(success_count/len(golden_tests))*100:.1f}%)")
+    print(f"Rejets (Confiance < 0.7) : {low_confidence_count} ({(low_confidence_count/len(golden_tests))*100:.1f}%)")
+    print(f"Erreurs : {error_count} ({(error_count/len(golden_tests))*100:.1f}%)")
 
 if __name__ == "__main__":
     # Vérifier que le modèle Ollama est dispo, sinon bypass pour le test
     # Dans un vrai CI, on s'assurerait que l'environnement RAG est up
     print("Golden tests prêts (Mocked run).")
-    # asyncio.run(run_golden_tests())
+    asyncio.run(run_golden_tests())
