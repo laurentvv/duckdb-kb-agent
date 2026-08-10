@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 import json
+import uuid
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openai import OpenAI
@@ -23,6 +24,37 @@ client = OpenAI(base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1
 
 class QueryRequest(BaseModel):
     question: str
+
+
+def rewrite_query(question: str) -> str:
+    """
+    Réécrit la requête utilisateur pour améliorer la recherche sémantique RAG.
+    """
+    prompt = f"""Rewrite the following user question to make it optimal for a keyword and semantic search in a knowledge base.
+    Fix any typos, expand abbreviations if obvious, and add relevant synonyms.
+    Keep the query concise and focused on the core information needed.
+    DO NOT answer the question. ONLY output the rewritten query.
+
+    Original question: {question}
+
+    Rewritten query:"""
+
+    try:
+        response = client.chat.completions.create(
+            model=OLLAMA_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=50
+        )
+        rewritten = response.choices[0].message.content.strip()
+        print(f"Original query: '{question}' -> Rewritten: '{rewritten}'")
+        # En cas de problème où le modèle bavarde trop, on nettoie un peu
+        if rewritten.lower().startswith("rewritten query:"):
+            rewritten = rewritten[len("rewritten query:"):].strip()
+        return rewritten if rewritten else question
+    except Exception as e:
+        print(f"Error rewriting query: {e}")
+        return question
 
 def get_context_from_db(query):
     """Recherche hybride au niveau chunk (FTS + vectoriel, fusion RRF).
@@ -90,14 +122,52 @@ async def read_index():
     with open("web/static/index.html", "r", encoding="utf-8") as f:
         return f.read()
 
+
+class FeedbackRequest(BaseModel):
+    interaction_id: str
+    rating: str
+    comment: str = ""
+
+@app.post("/api/feedback")
+async def receive_feedback(req: FeedbackRequest):
+    con = kb.connect(kb.DB_PATH, read_only=False)
+    try:
+        con.execute(
+            "UPDATE feedbacks SET rating = ?, comment = ? WHERE id = ?",
+            [req.rating, req.comment, req.interaction_id]
+        )
+    finally:
+        con.close()
+    return {"status": "ok"}
+
 @app.post("/api/ask")
 async def ask_question(req: QueryRequest):
     question = req.question
-    context, sources = get_context_from_db(question)
+
+    # ÉTAPE 1 : Réécriture de la requête
+    rewritten_query = rewrite_query(question)
+
+    context, sources = get_context_from_db(rewritten_query)
+
+    interaction_id = str(uuid.uuid4())
     
     if not sources:
         async def mock_stream():
-            msg = json.dumps({'sources': [], 'chunk': "Je n'ai trouvé aucun document pertinent dans la base de connaissances pour cette question."})
+            answer = "Je n'ai trouvé aucun document pertinent dans la base de connaissances pour cette question."
+
+            # Stocker en base (feedback empty)
+            con = kb.connect(kb.DB_PATH, read_only=False)
+            try:
+                con.execute(
+                    "INSERT INTO feedbacks (id, question, rewritten_query, context, answer) VALUES (?, ?, ?, ?, ?)",
+                    [interaction_id, question, rewritten_query, "", answer]
+                )
+            except Exception as e:
+                print(f"Error saving to feedbacks: {e}")
+            finally:
+                con.close()
+
+            msg = json.dumps({'interaction_id': interaction_id, 'sources': [], 'chunk': answer})
             yield f"data: {msg}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(mock_stream(), media_type="text/event-stream")
@@ -106,9 +176,10 @@ async def ask_question(req: QueryRequest):
     prompt = f"### Instruction \n {question} \n\n ### Context \n {context} \n\n ### Answer \n"
     
     async def generate():
-        # Envoie immédiat des sources détectées
-        yield f"data: {json.dumps({'sources': sources, 'chunk': ''})}\n\n"
+        # Envoie immédiat des sources et interaction_id
+        yield f"data: {json.dumps({'interaction_id': interaction_id, 'sources': sources, 'chunk': ''})}\n\n"
         
+        full_answer = ""
         try:
             response = client.chat.completions.create(
               model=OLLAMA_MODEL,
@@ -122,10 +193,25 @@ async def ask_question(req: QueryRequest):
             for chunk in response:
                 delta = chunk.choices[0].delta.content
                 if delta:
+                    full_answer += delta
                     yield f"data: {json.dumps({'chunk': delta})}\n\n"
+
+            # Stocker en base une fois terminé
+            con = kb.connect(kb.DB_PATH, read_only=False)
+            try:
+                con.execute(
+                    "INSERT INTO feedbacks (id, question, rewritten_query, context, answer) VALUES (?, ?, ?, ?, ?)",
+                    [interaction_id, question, rewritten_query, context, full_answer]
+                )
+            except Exception as e:
+                print(f"Error saving to feedbacks: {e}")
+            finally:
+                con.close()
+
             yield "data: [DONE]\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'chunk': f'\n\n**Erreur**: {str(e)}'})}\n\n"
+            error_msg = f"\n\n**Erreur**: {str(e)}"
+            yield f"data: {json.dumps({'chunk': error_msg})}\n\n"
             yield "data: [DONE]\n\n"
             
     return StreamingResponse(generate(), media_type="text/event-stream")

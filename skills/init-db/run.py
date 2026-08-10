@@ -74,6 +74,23 @@ def init_db(db_path: str = DB_PATH) -> None:
             """
         )
 
+
+        # Table pour stocker les interactions et feedbacks (Évaluation continue)
+        conn.execute(
+            '''
+            CREATE TABLE IF NOT EXISTS feedbacks (
+                id VARCHAR PRIMARY KEY,
+                question TEXT,
+                rewritten_query TEXT,
+                context TEXT,
+                answer TEXT,
+                rating VARCHAR,
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            '''
+        )
+
         # --- Extension FTS (BM25) ---
         try:
             conn.execute("INSTALL fts;")

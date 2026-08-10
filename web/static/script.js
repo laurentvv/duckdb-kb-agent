@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    function addMessage(content, type, sources = []) {
+    function addMessage(content, type, sources = [], interactionId = null) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${type}-msg`;
 
@@ -44,6 +44,53 @@ document.addEventListener('DOMContentLoaded', () => {
             msgDiv.appendChild(sourcesDiv);
         }
 
+
+        // Add feedback UI if bot message and interactionId exists
+        if (type === 'bot' && interactionId) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-container';
+            feedbackDiv.innerHTML = `
+                <div class="feedback-buttons">
+                    <button class="feedback-btn thumbs-up" data-id="${interactionId}" data-rating="up" title="Bonne réponse">👍</button>
+                    <button class="feedback-btn thumbs-down" data-id="${interactionId}" data-rating="down" title="Mauvaise réponse">👎</button>
+                </div>
+                <div class="feedback-comment-form" id="feedback-form-${interactionId}" style="display: none;">
+                    <input type="text" placeholder="Dites-nous ce qui n'allait pas..." class="feedback-input" id="feedback-input-${interactionId}">
+                    <button class="feedback-submit-btn" data-id="${interactionId}">Envoyer</button>
+                </div>
+            `;
+            msgDiv.appendChild(feedbackDiv);
+
+            // Event listeners
+            setTimeout(() => {
+                const upBtn = feedbackDiv.querySelector('.thumbs-up');
+                const downBtn = feedbackDiv.querySelector('.thumbs-down');
+                const form = feedbackDiv.querySelector(`#feedback-form-${interactionId}`);
+                const submitBtn = feedbackDiv.querySelector('.feedback-submit-btn');
+                const input = feedbackDiv.querySelector(`#feedback-input-${interactionId}`);
+
+                upBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'up');
+                    upBtn.classList.add('active');
+                    downBtn.classList.remove('active');
+                    form.style.display = 'none';
+                });
+
+                downBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'down');
+                    downBtn.classList.add('active');
+                    upBtn.classList.remove('active');
+                    form.style.display = 'flex';
+                });
+
+                submitBtn.addEventListener('click', () => {
+                    const comment = input.value.trim();
+                    sendFeedback(interactionId, 'down', comment);
+                    form.innerHTML = '<span class="feedback-thanks">Merci pour votre retour !</span>';
+                });
+            }, 100);
+        }
+
         chatContainer.appendChild(msgDiv);
         scrollToBottom();
     }
@@ -62,6 +109,53 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         
         msgDiv.appendChild(contentDiv);
+
+        // Add feedback UI if bot message and interactionId exists
+        if (type === 'bot' && interactionId) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-container';
+            feedbackDiv.innerHTML = `
+                <div class="feedback-buttons">
+                    <button class="feedback-btn thumbs-up" data-id="${interactionId}" data-rating="up" title="Bonne réponse">👍</button>
+                    <button class="feedback-btn thumbs-down" data-id="${interactionId}" data-rating="down" title="Mauvaise réponse">👎</button>
+                </div>
+                <div class="feedback-comment-form" id="feedback-form-${interactionId}" style="display: none;">
+                    <input type="text" placeholder="Dites-nous ce qui n'allait pas..." class="feedback-input" id="feedback-input-${interactionId}">
+                    <button class="feedback-submit-btn" data-id="${interactionId}">Envoyer</button>
+                </div>
+            `;
+            msgDiv.appendChild(feedbackDiv);
+
+            // Event listeners
+            setTimeout(() => {
+                const upBtn = feedbackDiv.querySelector('.thumbs-up');
+                const downBtn = feedbackDiv.querySelector('.thumbs-down');
+                const form = feedbackDiv.querySelector(`#feedback-form-${interactionId}`);
+                const submitBtn = feedbackDiv.querySelector('.feedback-submit-btn');
+                const input = feedbackDiv.querySelector(`#feedback-input-${interactionId}`);
+
+                upBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'up');
+                    upBtn.classList.add('active');
+                    downBtn.classList.remove('active');
+                    form.style.display = 'none';
+                });
+
+                downBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'down');
+                    downBtn.classList.add('active');
+                    upBtn.classList.remove('active');
+                    form.style.display = 'flex';
+                });
+
+                submitBtn.addEventListener('click', () => {
+                    const comment = input.value.trim();
+                    sendFeedback(interactionId, 'down', comment);
+                    form.innerHTML = '<span class="feedback-thanks">Merci pour votre retour !</span>';
+                });
+            }, 100);
+        }
+
         chatContainer.appendChild(msgDiv);
         scrollToBottom();
     }
@@ -71,6 +165,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (indicator) {
             indicator.remove();
         }
+    }
+
+
+    function sendFeedback(interactionId, rating, comment = "") {
+        fetch('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interaction_id: interactionId, rating: rating, comment: comment })
+        }).catch(err => console.error("Erreur feedback:", err));
     }
 
     form.addEventListener('submit', async (e) => {
@@ -109,10 +212,58 @@ document.addEventListener('DOMContentLoaded', () => {
             contentDiv.className = 'msg-content';
             msgDiv.appendChild(contentDiv);
             
-            chatContainer.appendChild(msgDiv);
+
+        // Add feedback UI if bot message and interactionId exists
+        if (type === 'bot' && interactionId) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-container';
+            feedbackDiv.innerHTML = `
+                <div class="feedback-buttons">
+                    <button class="feedback-btn thumbs-up" data-id="${interactionId}" data-rating="up" title="Bonne réponse">👍</button>
+                    <button class="feedback-btn thumbs-down" data-id="${interactionId}" data-rating="down" title="Mauvaise réponse">👎</button>
+                </div>
+                <div class="feedback-comment-form" id="feedback-form-${interactionId}" style="display: none;">
+                    <input type="text" placeholder="Dites-nous ce qui n'allait pas..." class="feedback-input" id="feedback-input-${interactionId}">
+                    <button class="feedback-submit-btn" data-id="${interactionId}">Envoyer</button>
+                </div>
+            `;
+            msgDiv.appendChild(feedbackDiv);
+
+            // Event listeners
+            setTimeout(() => {
+                const upBtn = feedbackDiv.querySelector('.thumbs-up');
+                const downBtn = feedbackDiv.querySelector('.thumbs-down');
+                const form = feedbackDiv.querySelector(`#feedback-form-${interactionId}`);
+                const submitBtn = feedbackDiv.querySelector('.feedback-submit-btn');
+                const input = feedbackDiv.querySelector(`#feedback-input-${interactionId}`);
+
+                upBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'up');
+                    upBtn.classList.add('active');
+                    downBtn.classList.remove('active');
+                    form.style.display = 'none';
+                });
+
+                downBtn.addEventListener('click', () => {
+                    sendFeedback(interactionId, 'down');
+                    downBtn.classList.add('active');
+                    upBtn.classList.remove('active');
+                    form.style.display = 'flex';
+                });
+
+                submitBtn.addEventListener('click', () => {
+                    const comment = input.value.trim();
+                    sendFeedback(interactionId, 'down', comment);
+                    form.innerHTML = '<span class="feedback-thanks">Merci pour votre retour !</span>';
+                });
+            }, 100);
+        }
+
+        chatContainer.appendChild(msgDiv);
             
             let fullText = '';
             let sourcesAdded = false;
+            let currentInteractionId = null;
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
@@ -136,6 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         try {
                             const data = JSON.parse(dataStr);
                             
+                            if (data.interaction_id) {
+                                currentInteractionId = data.interaction_id;
+                            }
                             if (data.sources && !sourcesAdded) {
                                 const sourcesDiv = document.createElement('div');
                                 sourcesDiv.className = 'msg-sources';
@@ -163,6 +317,50 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
+            }
+
+            // À la fin du stream, on injecte les boutons de feedback dans msgDiv
+            if (currentInteractionId) {
+                const feedbackDiv = document.createElement('div');
+                feedbackDiv.className = 'feedback-container';
+                feedbackDiv.innerHTML = `
+                    <div class="feedback-buttons">
+                        <button class="feedback-btn thumbs-up" data-id="${currentInteractionId}" data-rating="up" title="Bonne réponse">👍</button>
+                        <button class="feedback-btn thumbs-down" data-id="${currentInteractionId}" data-rating="down" title="Mauvaise réponse">👎</button>
+                    </div>
+                    <div class="feedback-comment-form" id="feedback-form-${currentInteractionId}" style="display: none;">
+                        <input type="text" placeholder="Dites-nous ce qui n'allait pas..." class="feedback-input" id="feedback-input-${currentInteractionId}">
+                        <button class="feedback-submit-btn" data-id="${currentInteractionId}">Envoyer</button>
+                    </div>
+                `;
+                msgDiv.appendChild(feedbackDiv);
+
+                const upBtn = feedbackDiv.querySelector('.thumbs-up');
+                const downBtn = feedbackDiv.querySelector('.thumbs-down');
+                const fForm = feedbackDiv.querySelector(`#feedback-form-${currentInteractionId}`);
+                const submitBtn = feedbackDiv.querySelector('.feedback-submit-btn');
+                const fInput = feedbackDiv.querySelector(`#feedback-input-${currentInteractionId}`);
+
+                upBtn.addEventListener('click', () => {
+                    sendFeedback(currentInteractionId, 'up');
+                    upBtn.classList.add('active');
+                    downBtn.classList.remove('active');
+                    fForm.style.display = 'none';
+                });
+
+                downBtn.addEventListener('click', () => {
+                    sendFeedback(currentInteractionId, 'down');
+                    downBtn.classList.add('active');
+                    upBtn.classList.remove('active');
+                    fForm.style.display = 'flex';
+                });
+
+                submitBtn.addEventListener('click', () => {
+                    const comment = fInput.value.trim();
+                    sendFeedback(currentInteractionId, 'down', comment);
+                    fForm.innerHTML = '<span class="feedback-thanks">Merci pour votre retour !</span>';
+                });
+                scrollToBottom();
             }
 
         } catch (error) {
