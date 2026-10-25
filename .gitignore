@@ -29,3 +29,6 @@ knowledge.reindex-vision-done.json
 bench/results*.jsonl
 bench/results*.md
 bench/REPORT_chunks_final.md
+# Agent local state (ledger, installed skills) - kept on disk, never committed
+.agent/
+.agent/*.duckdb.wal
